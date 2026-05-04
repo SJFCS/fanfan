@@ -276,7 +276,33 @@ async function loadRecommendation(context: RecommendationContext): Promise<Build
         firstPlace: augment.first_place / Math.max(augment.play, 1),
       })),
     })),
+    meta: getRecommendationMeta(mainChampion),
     warning,
+  }
+}
+
+function getRecommendationMeta(champion: OpggChampion): BuildRecommendation['meta'] {
+  const stats = champion.data.summary.average_stats
+  const rank = stats.rank > 0 ? stats.rank : null
+  let previousRank: number | null = null
+  let totalRank: number | null = null
+
+  if (isNormalChampion(champion)) {
+    const trends = champion.data.trends
+    const trendPoints = trends?.win ?? []
+    previousRank = trendPoints.find((point) => point.rank > 0 && point.rank !== rank)?.rank ?? null
+    totalRank = trends?.total_position_rank || trends?.total_rank || null
+  }
+
+  return {
+    rank,
+    previousRank,
+    // 排名数字越小越强：从 #80 到 #60 记为上升 20。
+    rankDelta: rank != null && previousRank != null ? previousRank - rank : null,
+    totalRank,
+    matchCount: champion.meta.match_count ?? null,
+    version: champion.meta.version,
+    updatedAt: champion.meta.analyzed_at ?? champion.meta.cached_at ?? '',
   }
 }
 

@@ -50,12 +50,15 @@
 
 .sobp-title-main {
   display: flex;
-  min-width: 0;
+  min-width: 280px;
+  flex: 1 1 auto;
   align-items: center;
   gap: 12px;
 }
 
 .sobp-title-text {
+  flex: 1 1 auto;
+  min-height: auto;
   min-width: 0;
 }
 
@@ -68,6 +71,8 @@
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 1px;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .sobp-title-mark {
@@ -76,10 +81,17 @@
   font-size: 13px;
 }
 
+.sobp-title-name {
+  min-width: 0;
+  flex: 0 1 auto;
+  text-overflow: ellipsis;
+}
+
 .sobp-mode-tag {
   flex: 0 0 auto;
   padding-left: 10px;
   border-left: 1px solid #3c2e16;
+  white-space: nowrap;
   color: rgb(160 155 140 / 72%);
   font-size: 12px;
   font-weight: 600;
@@ -90,7 +102,7 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
 }
 
 .sobp-close {
@@ -189,13 +201,64 @@
 }
 
 .sobp-summary-card--tier {
-  min-width: 46px;
+  min-width: 42px;
 }
 
 .sobp-summary-card--tier .sobp-summary-value {
   color: #c8aa6e;
   font-size: 19px;
   letter-spacing: 0.5px;
+}
+
+.sobp-tier-icon {
+  display: block;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.sobp-meta {
+  display: flex;
+  min-width: 150px;
+  align-items: flex-end;
+  padding-right: 16px;
+  border-right: 1px solid #3c2e16;
+}
+
+.sobp-meta-trend {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.sobp-meta-label {
+  color: #c8aa6e;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.sobp-meta-value {
+  color: #c8aa6e;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.sobp-meta-trend--up .sobp-meta-value {
+  color: #21d07a;
+}
+
+.sobp-meta-trend--down .sobp-meta-value {
+  color: #e84057;
+}
+
+.sobp-meta-trend--unknown .sobp-meta-value {
+  color: rgb(160 155 140 / 72%);
+}
+
+.sobp-meta-rank {
+  color: #f0e6d2;
+  font-size: 18px;
+  font-weight: 900;
 }
 
 .sobp-body {
@@ -213,12 +276,13 @@
   display: grid;
   grid-template-columns: 1.1fr 1.5fr 0.82fr;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .sobp-section {
   display: flex;
-  min-height: 168px;
+  height: 100%;
+  min-height: 214px;
   flex-direction: column;
   gap: 8px;
 }
@@ -243,6 +307,7 @@
 
 .sobp-section-card {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 4px;
   padding: 8px;
@@ -253,12 +318,54 @@
 
 .sobp-row {
   display: flex;
+  min-height: 46px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   padding: 8px;
   border-radius: 3px;
   background: rgb(255 255 255 / 1.5%);
+}
+
+.sobp-rune-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.sobp-apply-rune {
+  min-width: 48px;
+  height: 24px;
+  border: 1px solid rgb(200 170 110 / 45%);
+  border-radius: 3px;
+  background: rgb(1 10 19 / 65%);
+  color: #c8aa6e;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.sobp-apply-rune:hover:not(:disabled) {
+  border-color: rgb(200 170 110 / 80%);
+  background: rgb(200 170 110 / 14%);
+  color: #f0e6d2;
+}
+
+.sobp-apply-rune:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.sobp-apply-rune--done {
+  border-color: rgb(33 208 122 / 55%);
+  color: #21d07a;
+}
+
+.sobp-apply-rune--error {
+  border-color: rgb(232 64 87 / 55%);
+  color: #e84057;
 }
 
 .sobp-row-main {
@@ -349,6 +456,7 @@
   line-height: 1.45;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 140ms ease-out;
 }
 
 .sobp-official-tooltip--ready {
@@ -435,8 +543,8 @@
   height: 14px;
   flex: 0 0 auto;
   background-color: #cdbe91;
-  -webkit-mask-image: url('/fe/lol-match-history/icon_gold.png');
-  mask-image: url('/fe/lol-match-history/icon_gold.png');
+  -webkit-mask-image: url('../../assets/game-statistic-icons/Gold_icon.svg');
+  mask-image: url('../../assets/game-statistic-icons/Gold_icon.svg');
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -475,7 +583,7 @@
 
 .sobp-stat {
   display: flex;
-  width: 46px;
+  width: 75px;
   flex: 0 0 auto;
   flex-direction: column;
   align-items: flex-end;

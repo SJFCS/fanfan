@@ -1,5 +1,10 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import tier1Icon from '@/../assets/tier/t1.svg'
+import tier2Icon from '@/../assets/tier/t2.svg'
+import tier3Icon from '@/../assets/tier/t3.svg'
+import tier4Icon from '@/../assets/tier/t4.svg'
+import tier5Icon from '@/../assets/tier/t5.svg'
 import {
   getAugmentInfo,
   getChampionById,
@@ -14,6 +19,7 @@ import {
   getSpellInfo,
   getSpellName,
 } from '@/lib/assets'
+import { lcu } from '@/lib/lcu'
 import { type OpggItemBuild, type OpggMode, type OpggPosition, type OpggRuneBuild } from '@/lib/opgg-api'
 import '@/styles/OpggBuildRecommendationPanel.css'
 
@@ -39,7 +45,18 @@ export interface BuildRecommendation {
   lastItems: OpggItemBuild[]
   runePages: OpggRuneBuild[]
   augments: Array<{ rarity: number; items: Array<{ id: number; pickRate: number; averagePlace: number; firstPlace: number }> }>
+  meta?: RecommendationMeta
   warning?: string
+}
+
+export interface RecommendationMeta {
+  rank: number | null
+  previousRank: number | null
+  rankDelta: number | null
+  totalRank: number | null
+  matchCount: number | null
+  version: string
+  updatedAt: string
 }
 
 export interface OpggBuildRecommendationPanelProps {
@@ -76,12 +93,13 @@ export function OpggBuildRecommendationPanel({
           <div className="sobp-title-text">
             <div className="sobp-title">
               <span className="sobp-title-mark">❖</span>
-              <span>{championName}</span>
+              <span className="sobp-title-name">{championName}</span>
               {modeTags && <span className="sobp-mode-tag">{modeTags}</span>}
             </div>
           </div>
         </div>
         <div className="sobp-title-actions">
+          <TrendMeta meta={recommendation?.meta} />
           <SummaryCards values={recommendation?.summary ?? []} />
           <button type="button" className="sobp-close" onClick={onClose} aria-label="关闭配装推荐">
             ×
@@ -92,7 +110,7 @@ export function OpggBuildRecommendationPanel({
       <main className="sobp-body">
         <div className="sobp-grid">
           <ItemSection title="核心装备" builds={recommendation?.coreItems} itemLimit={3} />
-          <RuneSection title="符文搭配" runes={recommendation?.runePages} />
+          <RuneSection title="符文搭配" runes={recommendation?.runePages} championName={championName} />
           <SpellSection title="召唤师技能" builds={recommendation?.summonerSpells} limit={2} />
         </div>
 
@@ -137,13 +155,68 @@ function SummaryCards({ values }: { values: string[] }) {
         const metric = splitSummaryMetric(value)
         return (
           <div className={`sobp-summary-card sobp-summary-card--${metric.kind}`} key={value}>
-            {metric.label && <span className="sobp-summary-label">{metric.label}</span>}
-            <span className="sobp-summary-value">{metric.metric}</span>
+            {metric.kind === 'tier'
+              ? <TierBadge value={metric.metric} />
+              : (
+                <>
+                  {metric.label && <span className="sobp-summary-label">{metric.label}</span>}
+                  <span className="sobp-summary-value">{metric.metric}</span>
+                </>
+              )}
           </div>
         )
       })}
     </div>
   )
+}
+
+function TrendMeta({ meta }: { meta?: RecommendationMeta }) {
+  if (!meta) return null
+
+  const trend = getRankTrend(meta.rankDelta)
+  const rankText = meta.rank && meta.totalRank ? `${meta.rank}/${meta.totalRank}` : meta.rank ? `#${meta.rank}` : ''
+
+  return (
+    <div className="sobp-meta">
+      <div className={`sobp-meta-trend sobp-meta-trend--${trend.kind}`}>
+        <span className="sobp-meta-label">趋势：</span>
+        <span className="sobp-meta-value">{trend.text}</span>
+        {rankText && <span className="sobp-meta-rank">{rankText}</span>}
+      </div>
+    </div>
+  )
+}
+
+function getRankTrend(delta: number | null): { kind: 'up' | 'down' | 'flat' | 'unknown'; text: string } {
+  if (delta == null) return { kind: 'unknown', text: '暂无' }
+  if (delta > 0) return { kind: 'up', text: `↑ ${delta}` }
+  if (delta < 0) return { kind: 'down', text: `↓ ${Math.abs(delta)}` }
+  return { kind: 'flat', text: '持平' }
+}
+
+function TierBadge({ value }: { value: string }) {
+  const tier = Number.parseInt(value.replace(/\D/g, ''), 10)
+  const icon = getTierIcon(tier)
+  if (!icon) return <span className="sobp-summary-value">{value}</span>
+
+  return <img className="sobp-tier-icon" src={icon} alt={value} title={value} />
+}
+
+function getTierIcon(tier: number): string {
+  switch (tier) {
+    case 1:
+      return tier1Icon
+    case 2:
+      return tier2Icon
+    case 3:
+      return tier3Icon
+    case 4:
+      return tier4Icon
+    case 5:
+      return tier5Icon
+    default:
+      return ''
+  }
 }
 
 type SummaryKind = 'win-high' | 'win-low' | 'win-even' | 'pick' | 'tier' | 'rank' | 'default'
@@ -253,13 +326,42 @@ function SpellSection({ title, builds, limit }: { title: string; builds?: OpggIt
   )
 }
 
-function RuneSection({ title, runes }: { title: string; runes?: OpggRuneBuild[] }) {
+function RuneSection({ title, runes, championName }: { title: string; runes?: OpggRuneBuild[]; championName: string }) {
   const visibleRunes = runes?.slice(0, 2) ?? []
   const maxRate = getMaxRunePickRate(visibleRunes, 0.15)
+  const [applyingKey, setApplyingKey] = useState('')
+  const [appliedKey, setAppliedKey] = useState('')
+  const [applyErrorKey, setApplyErrorKey] = useState('')
+
+  const applyRune = async (rune: OpggRuneBuild, index: number) => {
+    const key = `${index}-${rune.id}`
+    setApplyingKey(key)
+    setAppliedKey('')
+    setApplyErrorKey('')
+
+    try {
+      await lcu.applyRunePage({
+        name: championName,
+        primaryStyleId: rune.primary_page_id,
+        subStyleId: rune.secondary_page_id,
+        selectedPerkIds: [
+          ...rune.primary_rune_ids,
+          ...rune.secondary_rune_ids,
+          ...rune.stat_mod_ids,
+        ],
+      })
+      setAppliedKey(key)
+    } catch {
+      setApplyErrorKey(key)
+    } finally {
+      setApplyingKey('')
+    }
+  }
 
   return (
     <Section title={title} empty={visibleRunes.length === 0}>
       {visibleRunes.map((rune, index) => {
+        const applyKey = `${index}-${rune.id}`
         const keystoneId = rune.primary_rune_ids[0] ?? 0
         const keystone = getPerkInfo(keystoneId)
         return (
@@ -286,7 +388,20 @@ function RuneSection({ title, runes }: { title: string; runes?: OpggRuneBuild[] 
                 </div>
               </div>
             </div>
-            <StatBar value={rune.pick_rate} maxRate={maxRate} />
+            <div className="sobp-rune-actions">
+              <StatBar value={rune.pick_rate} maxRate={maxRate} />
+              <button
+                type="button"
+                className={`sobp-apply-rune${appliedKey === applyKey ? ' sobp-apply-rune--done' : ''}${applyErrorKey === applyKey ? ' sobp-apply-rune--error' : ''}`}
+                disabled={applyingKey === applyKey}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  void applyRune(rune, index)
+                }}
+              >
+                {applyingKey === applyKey ? '应用中' : appliedKey === applyKey ? '已应用' : applyErrorKey === applyKey ? '失败' : '应用'}
+              </button>
+            </div>
           </div>
         )
       })}
@@ -422,12 +537,14 @@ function IconTooltip({
 }) {
   const anchorRef = useRef<HTMLSpanElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
-  const [open, setOpen] = useState(false)
+  const closeTimerRef = useRef<number | null>(null)
+  const [mounted, setMounted] = useState(false)
+  const [visible, setVisible] = useState(false)
   const [position, setPosition] = useState<TooltipPosition>({ left: 0, top: 0, arrowLeft: 0, placement: 'top', ready: false })
   const parsedDescription = parseTooltipDescription(description)
 
   useLayoutEffect(() => {
-    if (!open || !anchorRef.current || !tooltipRef.current) return
+    if (!mounted || !anchorRef.current || !tooltipRef.current) return
 
     const margin = 8
     const gap = 10
@@ -449,20 +566,39 @@ function IconTooltip({
 
     const arrowLeft = Math.max(14, Math.min(center - left, tooltip.width - 14))
     setPosition({ left, top, arrowLeft, placement, ready: true })
-  }, [open, title, description, subtitle, price])
+
+    const frame = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(frame)
+  }, [mounted, title, description, subtitle, price])
+
+  const showTooltip = () => {
+    if (closeTimerRef.current != null) {
+      window.clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+    setMounted(true)
+  }
+
+  const hideTooltip = () => {
+    setVisible(false)
+    closeTimerRef.current = window.setTimeout(() => {
+      setMounted(false)
+      closeTimerRef.current = null
+    }, 140)
+  }
 
   return (
     <span
       ref={anchorRef}
       className="sobp-icon-tooltip-wrap"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={showTooltip}
+      onMouseLeave={hideTooltip}
     >
       {children}
-      {open && createPortal(
+      {mounted && createPortal(
         <div
           ref={tooltipRef}
-          className={`sobp-official-tooltip sobp-official-tooltip--${position.placement}${position.ready ? ' sobp-official-tooltip--ready' : ''}`}
+          className={`sobp-official-tooltip sobp-official-tooltip--${position.placement}${position.ready && visible ? ' sobp-official-tooltip--ready' : ''}`}
           style={{
             left: position.left,
             top: position.top,

@@ -91,6 +91,22 @@ function put<T = unknown>(endpoint: string, body?: unknown): Promise<T> {
   })
 }
 
+export interface RunePagePayload {
+  name: string
+  primaryStyleId: number
+  subStyleId: number
+  selectedPerkIds: number[]
+  current: boolean
+}
+
+export interface RunePage extends RunePagePayload {
+  id: number
+  isActive?: boolean
+  isDeletable?: boolean
+  isEditable?: boolean
+  order?: number
+}
+
 function patch<T = unknown>(endpoint: string, body?: unknown): Promise<T> {
   return request<T>(endpoint, {
     method: 'PATCH',
@@ -991,8 +1007,46 @@ class LCUManager {
   }
 
   /** 获取斗魂竞技场 / 海克斯模式强化符文数据 */
-  getAugments(): Promise<Array<{ id: number; nameTRA: string; augmentSmallIconPath: string; rarity: string; [key: string]: unknown }>> {
+  getAugments(): Promise<Array<{ id: number; nameTRA: string; simpleNameTRA: string; augmentSmallIconPath: string; rarity: string }>> {
     return get('/lol-game-data/assets/v1/cherry-augments.json')
+  }
+
+  /** 获取玩家符文页 */
+  getRunePages(): Promise<RunePage[]> {
+    return get<RunePage[]>('/lol-perks/v1/pages')
+  }
+
+  /** 创建符文页 */
+  createRunePage(page: RunePagePayload): Promise<RunePage> {
+    return post<RunePage>('/lol-perks/v1/pages', page)
+  }
+
+  /** 更新指定符文页 */
+  updateRunePage(id: number, page: RunePagePayload): Promise<RunePage> {
+    return put<RunePage>(`/lol-perks/v1/pages/${id}`, page)
+  }
+
+  /** 创建或更新同名符文页，并设为当前使用页 */
+  async applyRunePage(page: Omit<RunePagePayload, 'current'>): Promise<RunePage> {
+    const payload: RunePagePayload = {
+      ...page,
+      current: true,
+    }
+    const pages = await this.getRunePages()
+    const existing = pages.find((p) => p.name === page.name && p.isEditable !== false)
+    if (existing) {
+      return this.updateRunePage(existing.id, payload)
+    }
+
+    try {
+      return await this.createRunePage(payload)
+    } catch (err) {
+      const fallback = pages.find((p) => p.current && p.isEditable !== false) ?? pages.find((p) => p.isEditable !== false)
+      if (fallback) {
+        return this.updateRunePage(fallback.id, payload)
+      }
+      throw err
+    }
   }
 
 

@@ -258,25 +258,12 @@ async function tryInit(attempt: number) {
   }
   for (const augment of augments) {
     if (augment.id > 0) {
-      const augmentRecord = augment as Record<string, unknown>
       augmentMap.set(augment.id, {
         name: augment.nameTRA || String(augment.id),
         iconPath: augment.augmentSmallIconPath ? normalizePath(augment.augmentSmallIconPath) : '',
         rarity: augment.rarity || '',
-        description: pickDescription(augmentRecord, [
-          'descTRA',
-          'descriptionTRA',
-          'tooltipTRA',
-          'augmentDescriptionTRA',
-          'augmentDescTRA',
-          'description',
-          'tooltip',
-          'tooltipText',
-          'augmentDescription',
-          'augmentDesc',
-          'details',
-          'effect',
-        ]),
+        // cherry-augments.json 目前只暴露名称、图标和稀有度，没有效果描述字段。
+        description: '',
       })
     }
   }
