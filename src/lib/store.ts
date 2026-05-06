@@ -125,7 +125,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   windowEffect: 'none',
   champSelectAssist: false,
   opggBuildRecommendation: false,
-  opggBuildRecommendationTier: 'master_plus',
+  opggBuildRecommendationTier: 'emerald_plus',
   analyzeTeamPower: false,
   analyzeTeamPowerMsgType: 'celebration',
   analyzeTeamPowerFetchCount: 50,

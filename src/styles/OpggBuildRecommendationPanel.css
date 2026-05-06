@@ -94,8 +94,8 @@
 
 .sobp-mode-tag {
   position: absolute;
-  top: calc(50% + 11px);
-  left: 22px;
+  top: calc(50% + 15px);
+  left: 20px;
   overflow: hidden;
   max-width: calc(100% - 22px);
   text-overflow: ellipsis;
@@ -118,7 +118,7 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 10px;
-  min-width: 190px;
+  min-width: 120px;
   color: #c8aa6e;
   font-size: 14px;
   font-weight: 800;

@@ -164,7 +164,6 @@ export function OpggBuildRecommendationPanel({
 function TierFilterSelect({ value, onChange }: { value: OpggTier; onChange: (tier: OpggTier) => void }) {
   return (
     <div className="sobp-tier-filter">
-      <span className="sobp-tier-filter-label">段位</span>
       <SonaSelect
         value={value}
         onChange={(nextValue) => onChange(nextValue as OpggTier)}
