@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { SonaSelect } from '@/components/ui/SonaSelect'
 import tier1Icon from '@/../assets/tier/t1.svg'
 import tier2Icon from '@/../assets/tier/t2.svg'
 import tier3Icon from '@/../assets/tier/t3.svg'
@@ -20,10 +21,38 @@ import {
   getSpellName,
 } from '@/lib/assets'
 import { lcu } from '@/lib/lcu'
-import { type OpggItemBuild, type OpggMode, type OpggPosition, type OpggRuneBuild } from '@/lib/opgg-api'
+import { type OpggItemBuild, type OpggMode, type OpggPosition, type OpggRuneBuild, type OpggTier } from '@/lib/opgg-api'
 import '@/styles/OpggBuildRecommendationPanel.css'
 
 const MAX_RECOMMENDATION_ROWS = 3
+const RANKED_MINI_CREST_BASE = 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests'
+const OPGG_TIER_BASE_OPTIONS: Array<{ value: OpggTier; label: string }> = [
+  { value: 'all', label: '全部段位' },
+  { value: 'challenger', label: '最强王者' },
+  { value: 'grandmaster', label: '傲世宗师' },
+  { value: 'master_plus', label: '超凡大师+' },
+  { value: 'master', label: '超凡大师' },
+  { value: 'diamond_plus', label: '璀璨钻石+' },
+  { value: 'diamond', label: '璀璨钻石' },
+  { value: 'emerald_plus', label: '流光翡翠+' },
+  { value: 'emerald', label: '流光翡翠' },
+  { value: 'platinum_plus', label: '华贵铂金+' },
+  { value: 'platinum', label: '华贵铂金' },
+  { value: 'gold_plus', label: '荣耀黄金+' },
+  { value: 'gold', label: '荣耀黄金' },
+  { value: 'silver', label: '不屈白银' },
+  { value: 'bronze', label: '英勇黄铜' },
+  { value: 'iron', label: '坚韧黑铁' },
+]
+const OPGG_TIER_OPTIONS: Array<{ value: OpggTier; label: string; icon?: string }> = OPGG_TIER_BASE_OPTIONS.map((option) => ({
+  ...option,
+  icon: getOpggTierIcon(option.value),
+}))
+
+function getOpggTierIcon(tier: OpggTier): string {
+  if (tier === 'all' || tier === 'ibsg') return ''
+  return `${RANKED_MINI_CREST_BASE}/${tier.replace('_plus', '')}.svg`
+}
 
 export interface RecommendationContext {
   championId: number
@@ -66,6 +95,8 @@ export interface OpggBuildRecommendationPanelProps {
   recommendation: BuildRecommendation | null
   loadError: string
   isLoading: boolean
+  selectedTier: OpggTier
+  onTierChange: (tier: OpggTier) => void
   onClose: () => void
 }
 
@@ -74,6 +105,8 @@ export function OpggBuildRecommendationPanel({
   recommendation,
   loadError,
   isLoading,
+  selectedTier,
+  onTierChange,
   onClose,
 }: OpggBuildRecommendationPanelProps) {
   const champion = getChampionById(context.championId)
@@ -96,11 +129,12 @@ export function OpggBuildRecommendationPanel({
             <div className="sobp-title">
               <span className="sobp-title-mark">❖</span>
               <span className="sobp-title-name">{championName}</span>
-              {modeTags && <span className="sobp-mode-tag">{modeTags}</span>}
             </div>
+            {modeTags && <div className="sobp-mode-tag">{modeTags}</div>}
           </div>
         </div>
         <div className="sobp-title-actions">
+          <TierFilterSelect value={selectedTier} onChange={onTierChange} />
           <TrendMeta meta={recommendation?.meta} />
           <SummaryCards values={recommendation?.summary ?? []} />
           <button type="button" className="sobp-close" onClick={onClose} aria-label="关闭配装推荐">
@@ -123,6 +157,19 @@ export function OpggBuildRecommendationPanel({
         {recommendation?.warning && <PanelMessage warning>{recommendation.warning}</PanelMessage>}
         {!isLoading && !loadError && !recommendation && <PanelMessage>暂无可用 OP.GG 推荐数据。</PanelMessage>}
       </main>
+    </div>
+  )
+}
+
+function TierFilterSelect({ value, onChange }: { value: OpggTier; onChange: (tier: OpggTier) => void }) {
+  return (
+    <div className="sobp-tier-filter">
+      <span className="sobp-tier-filter-label">段位</span>
+      <SonaSelect
+        value={value}
+        onChange={(nextValue) => onChange(nextValue as OpggTier)}
+        options={OPGG_TIER_OPTIONS}
+      />
     </div>
   )
 }
