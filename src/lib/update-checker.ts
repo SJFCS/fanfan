@@ -1,6 +1,7 @@
 declare const __PLUGIN_VERSION__: string
 
 import { logger } from '@/index'
+import { lcu } from '@/lib/lcu'
 
 export interface UpdateInfo {
   currentVersion: string
@@ -26,11 +27,12 @@ export interface UpdateState {
 }
 
 const RELEASE_PAGE_URL = 'https://com.hytale.net.cn/WJZ-P/sona/releases'
-const RELEASE_API_URLS = [
-  'https://com.hytale.net.cn/api.github.com/repos/WJZ-P/sona/releases/latest',
-  'https://com.hytale.net.cn/repos/WJZ-P/sona/releases/latest',
-  'https://api.github.com/repos/WJZ-P/sona/releases/latest',
-]
+const GITHUB_API_LATEST = 'https://api.github.com/repos/WJZ-P/sona/releases/latest'
+const GITHUB_API_RELEASES = 'https://api.github.com/repos/WJZ-P/sona/releases'
+
+function wrapCorsProxy(targetUrl: string): string {
+  return `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+}
 // 调试更新页时临时填版本号；发布前保持空字符串。
 const DEBUG_CURRENT_VERSION = '1.0.0'
 
@@ -40,6 +42,7 @@ let state: UpdateState = {
   error: '',
 }
 let inFlight: Promise<UpdateState> | null = null
+let notifiedVersion = ''
 const listeners = new Set<(state: UpdateState) => void>()
 
 function emit() {
@@ -87,14 +90,18 @@ function compareVersion(a: string, b: string): number {
 
 async function fetchLatestRelease(): Promise<GithubReleaseResponse> {
   const errors: string[] = []
+  const candidates: Array<{ url: string; kind: 'single' | 'array' }> = [
+    { url: wrapCorsProxy(GITHUB_API_LATEST), kind: 'single' },
+    { url: wrapCorsProxy(GITHUB_API_RELEASES), kind: 'array' },
+  ]
 
-  for (const url of RELEASE_API_URLS) {
+  for (const { url, kind } of candidates) {
     try {
       const response = await fetch(url, {
         method: 'GET',
         mode: 'cors',
         headers: {
-          Accept: 'application/vnd.github+json, application/json',
+          Accept: 'application/vnd.github+json',
         },
       })
       const text = await response.text()
@@ -104,8 +111,12 @@ async function fetchLatestRelease(): Promise<GithubReleaseResponse> {
         continue
       }
 
-      const data = JSON.parse(text) as GithubReleaseResponse
-      if (!data.tag_name) {
+      const parsed = JSON.parse(text) as unknown
+      const data = kind === 'single'
+        ? (parsed as GithubReleaseResponse)
+        : (Array.isArray(parsed) && parsed[0] ? (parsed[0] as GithubReleaseResponse) : null)
+
+      if (!data?.tag_name) {
         errors.push(`${url} -> missing tag_name`)
         continue
       }
@@ -152,6 +163,7 @@ export function checkForUpdates(): Promise<UpdateState> {
       }
       setState(next)
       logger.info('[Update] 检测到新版本: %s -> %s', currentVersion, latestVersion)
+      notifyUpdateAvailable(currentVersion, latestVersion)
       return next
     })
     .catch((err) => {
@@ -166,4 +178,17 @@ export function checkForUpdates(): Promise<UpdateState> {
     })
 
   return inFlight
+}
+
+function notifyUpdateAvailable(currentVersion: string, latestVersion: string) {
+  if (notifiedVersion === latestVersion) return
+  notifiedVersion = latestVersion
+
+  void lcu.sendNotification(
+    '检测到 Sona 新版本',
+    `${currentVersion} → ${latestVersion}，打开 Sona 面板查看更新内容。`,
+  ).catch((err) => {
+    notifiedVersion = ''
+    logger.warn('[Update] 发送更新通知失败:', err)
+  })
 }

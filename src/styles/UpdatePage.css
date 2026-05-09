@@ -1,42 +1,30 @@
 .sona-update-page {
-  height: 100%;
+  min-height: 100%;
   padding: 32px;
-  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .sona-update-title {
-  margin: 0 0 22px;
+  margin: 0 0 12px;
   color: #f0e6d2;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-shadow: 0 0 8px rgba(232, 64, 87, 0.22);
-}
-
-.sona-update-version-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 18px;
-  padding: 16px 18px;
-  border: 1px solid rgba(232, 64, 87, 0.35);
-  border-radius: 4px;
-  background: linear-gradient(90deg, rgba(232, 64, 87, 0.12), rgba(1, 10, 19, 0.66));
-}
-
-.sona-update-version {
-  color: #a09b8c;
   font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px rgba(46, 204, 113, 0.22);
+}
+
+.sona-update-title-version {
+  color: #a09b8c;
   font-weight: 800;
 }
 
-.sona-update-version--latest {
-  color: #e84057;
+.sona-update-title-version--latest {
+  color: #2ecc71;
 }
 
-.sona-update-arrow {
+.sona-update-title-arrow {
+  margin: 0 8px;
   color: #c8aa6e;
-  font-size: 20px;
   font-weight: 800;
 }
 
@@ -68,9 +56,7 @@
 }
 
 .sona-update-notes {
-  max-height: 250px;
   margin: 0;
-  overflow: auto;
   color: #cdbe91;
   font-family: inherit;
   font-size: 12px;

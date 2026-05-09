@@ -50,7 +50,7 @@ function PageContent({ pageId }: { pageId: string }) {
 
 export function App() {
   const [visible, setVisible] = useState(isModalVisible())
-  const [activePageId, setActivePageId] = useState('home')
+  const [activePageId, setActivePageId] = useState(() => (getUpdateState().status === 'available' ? 'update' : 'home'))
   const [sidebarCollapsed, setSidebarCollapsed] = useState(store.get('sidebarCollapsed'))
   const [devMode, setDevMode] = useState(store.get('developerMode'))
   const [updateState, setUpdateState] = useState<UpdateState>(() => getUpdateState())
@@ -60,6 +60,9 @@ export function App() {
       const rootConnected = Boolean(document.getElementById('sona-root')?.isConnected)
       logger.debug('Modal visibility changed: %s (root in DOM: %s)', String(v), String(rootConnected))
       setVisible(v)
+      if (v && getUpdateState().status === 'available') {
+        setActivePageId('update')
+      }
     })
   }, [])
 
