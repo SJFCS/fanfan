@@ -53,6 +53,19 @@ export interface SonaConfig {
   opggBuildRecommendation: boolean
   /** 智能配装（后续扩展符文、召唤师技能持久化） */
   smartBuildRecommendation: boolean
+  /** 智能符文：按英雄与模式保存的用户符文页 */
+  smartRunePages: Record<string, {
+    primaryStyleId: number
+    subStyleId: number
+    selectedPerkIds: number[]
+    updatedAt: number
+  }>
+  /** 智能召唤师技能：按英雄与模式保存的技能组合 */
+  smartSummonerSpells: Record<string, {
+    spell1Id: number
+    spell2Id: number
+    updatedAt: number
+  }>
   /** OP.GG 配装推荐段位过滤 */
   opggBuildRecommendationTier: string
   /** 分析友方战力（进入选人自动查战绩并发送到聊天框） */
@@ -138,6 +151,8 @@ const DEFAULT_CONFIG: SonaConfig = {
   champSelectAssist: false,
   opggBuildRecommendation: false,
   smartBuildRecommendation: true,
+  smartRunePages: {},
+  smartSummonerSpells: {},
   opggBuildRecommendationTier: 'emerald_plus',
   analyzeTeamPower: false,
   analyzeTeamPowerMsgType: 'celebration',

@@ -150,7 +150,7 @@ export function OpggBuildRecommendationPanel({
       <main className="sobp-body">
         <div className="sobp-grid">
           <ItemSection title="核心装备" builds={recommendation?.coreItems} itemLimit={3} />
-          <RuneSection title="符文搭配" runes={recommendation?.runePages} championName={championName} />
+          <RuneSection title="符文搭配" runes={recommendation?.runePages} championName={championName} modeLabel={recommendation?.modeLabel || queueText} />
           <SpellSection title="召唤师技能" builds={recommendation?.summonerSpells} limit={MAX_RECOMMENDATION_ROWS} />
         </div>
 
@@ -413,7 +413,7 @@ function SpellSection({ title, builds, limit }: { title: string; builds?: OpggIt
   )
 }
 
-function RuneSection({ title, runes, championName }: { title: string; runes?: OpggRuneBuild[]; championName: string }) {
+function RuneSection({ title, runes, championName, modeLabel }: { title: string; runes?: OpggRuneBuild[]; championName: string; modeLabel: string }) {
   const visibleRunes = runes?.slice(0, MAX_RECOMMENDATION_ROWS) ?? []
   const maxRate = getMaxRunePickRate(visibleRunes, 0.15)
   const [applyingKey, setApplyingKey] = useState('')
@@ -427,8 +427,9 @@ function RuneSection({ title, runes, championName }: { title: string; runes?: Op
     setApplyErrorKey('')
 
     try {
+      const pageName = `${championName} ${modeLabel} - Sona`
       await lcu.applyRunePage({
-        name: championName,
+        name: pageName,
         primaryStyleId: rune.primary_page_id,
         subStyleId: rune.secondary_page_id,
         selectedPerkIds: [
@@ -439,7 +440,7 @@ function RuneSection({ title, runes, championName }: { title: string; runes?: Op
       })
       setAppliedKey(key)
       try {
-        await lcu.sendChampSelectMessage(`${championName} 符文已应用`, 'celebration')
+        await lcu.sendChampSelectMessage(`${championName} ${modeLabel} 符文已应用 - Sona`, 'celebration')
       } catch {
         // 非选人阶段或聊天室未就绪时忽略
       }
