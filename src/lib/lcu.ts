@@ -37,6 +37,7 @@ import type {
 } from '@/types/lcu'
 import { SGP_SERVERS } from '@/types/sgp'
 import type { SgpEntitlementsToken } from '@/types/sgp'
+import { store } from '@/lib/store'
 
 // Re-export types for convenience
 export type { SummonerInfo, LobbyConfig, Lobby, GameflowPhase, GameflowSession, LCUEventMessage, ChatConversation, ChatMessage, ChatMe, Availability, SendChatMessageBody, ReadyCheck, ChampSelectSession, ChampSelectPlayerDetail, MatchHistoryResponse, MatchDetail, ChatFriend, SpectatorLaunchPayload }
@@ -44,6 +45,12 @@ export type { SgpEntitlementsToken, SgpMatchHistoryLol } from '@/types/sgp'
 export { SGP_SERVERS, TENCENT_MATCH_HISTORY_INTEROP, TENCENT_SERVER_NAMES, queueIdToTag } from '@/types/sgp'
 
 export { LcuEventUri, QueueId } from '@/types/lcu'
+
+type GameSettingsBackup = {
+  general?: unknown
+  input?: unknown
+  timestamp: number
+}
 
 // ==================== 底层请求方法 ====================
 
@@ -1200,14 +1207,16 @@ class LCUManager {
     return session.puuid
   }
 
-  private loadAllBackups(puuid: string): Record<string, { general?: unknown; input?: unknown; timestamp: number }> {
-    const raw = localStorage.getItem(`sona_backups_${puuid}`)
-    if (!raw) return {}
-    try { return JSON.parse(raw) } catch { return {} }
+  private loadAllBackups(puuid: string): Record<string, GameSettingsBackup> {
+    const allBackups = store.get('gameSettingsBackups')
+    return allBackups[puuid] ?? {}
   }
 
-  private saveAllBackups(puuid: string, data: Record<string, unknown>) {
-    localStorage.setItem(`sona_backups_${puuid}`, JSON.stringify(data))
+  private saveAllBackups(puuid: string, data: Record<string, GameSettingsBackup>) {
+    store.set('gameSettingsBackups', {
+      ...store.get('gameSettingsBackups'),
+      [puuid]: data,
+    })
   }
 
   /** 获取常规游戏设置（画质、声音、HUD 等，对应 game.cfg） */

@@ -91,10 +91,15 @@ function wrapSend(xhr: XMLHttpRequest, state: XhrHookState, meta: XhrRequestMeta
     const latestMeta = state.metaByRequest.get(this) ?? meta
     const matchedRule = findMatchedRule(state, latestMeta)
 
-    if (matchedRule) {
+    if (matchedRule?.action === 'networkError') {
       logBlockedRequest(state, latestMeta, matchedRule)
       simulateNetworkError(this, latestMeta)
       return undefined
+    }
+
+    if (matchedRule?.action === 'rewriteResponse') {
+      logRewrittenRequest(state, latestMeta, matchedRule)
+      installResponseRewrite(this, latestMeta, matchedRule)
     }
 
     return Reflect.apply(originalSend, this, arguments)
@@ -170,6 +175,35 @@ function simulateNetworkError(xhr: XMLHttpRequest, meta: XhrRequestMeta) {
   }
 }
 
+function installResponseRewrite(xhr: XMLHttpRequest, meta: XhrRequestMeta, rule: XhrMatchedRule) {
+  let rewritten = false
+
+  const rewrite = () => {
+    if (rewritten || xhr.readyState !== XMLHttpRequest.DONE) return
+    rewritten = true
+
+    const rawValue = typeof rule.response === 'function'
+      ? rule.response(meta, xhr)
+      : rule.response
+    const textValue = typeof rawValue === 'string'
+      ? rawValue
+      : JSON.stringify(rawValue ?? null)
+    const responseValue = xhr.responseType === 'json' ? rawValue : textValue
+
+    if (typeof rule.status === 'number') {
+      defineXhrValue(xhr, 'status', rule.status)
+    }
+    if (typeof rule.statusText === 'string') {
+      defineXhrValue(xhr, 'statusText', rule.statusText)
+    }
+    defineXhrValue(xhr, 'response', responseValue)
+    defineXhrValue(xhr, 'responseText', textValue)
+  }
+
+  xhr.addEventListener('readystatechange', rewrite, true)
+  xhr.addEventListener('load', rewrite, true)
+}
+
 function defineXhrValue(xhr: XMLHttpRequest, key: keyof XMLHttpRequest, value: unknown) {
   try {
     Object.defineProperty(xhr, key, {
@@ -198,4 +232,11 @@ function logBlockedRequest(state: XhrHookState, meta: XhrRequestMeta, rule: XhrM
 
   state.loggedRuleIds.add(rule.id)
   console.info('[Sona][XHR] Blocked request by rule "%s": %s %s', rule.id, meta.method, meta.url)
+}
+
+function logRewrittenRequest(state: XhrHookState, meta: XhrRequestMeta, rule: XhrMatchedRule) {
+  if (state.loggedRuleIds.has(rule.id)) return
+
+  state.loggedRuleIds.add(rule.id)
+  console.info('[Sona][XHR] Rewrote response by rule "%s": %s %s', rule.id, meta.method, meta.url)
 }

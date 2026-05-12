@@ -1,4 +1,4 @@
-export type XhrRuleAction = 'networkError'
+export type XhrRuleAction = 'networkError' | 'rewriteResponse'
 
 export interface XhrRequestMeta {
   method: string
@@ -12,6 +12,9 @@ export interface XhrRule {
   id: string
   match: XhrRuleMatcher
   action: XhrRuleAction
+  response?: string | boolean | number | null | ((meta: XhrRequestMeta, xhr: XMLHttpRequest) => unknown)
+  status?: number
+  statusText?: string
   description?: string
 }
 

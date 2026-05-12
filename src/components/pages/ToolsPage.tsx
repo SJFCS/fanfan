@@ -126,6 +126,7 @@ export function ToolsPage() {
   const [sideIndicatorMsgType, setSideIndicatorMsgType] = useState(store.get('sideIndicatorMsgType'))
   const [friendSmartGroup, setFriendSmartGroup] = useState(store.get('friendSmartGroup'))
   const [customProfileBg, setCustomProfileBg] = useState(store.get('customProfileBg'))
+  const [ignoreProfilePrivacy, setIgnoreProfilePrivacy] = useState(store.get('ignoreProfilePrivacy'))
   const [customBanner, setCustomBanner] = useState(store.get('customBanner'))
   const [rankQueue, setRankQueue] = useState(store.get('rankQueue'))
   const [rankTier, setRankTier] = useState(store.get('rankTier'))
@@ -178,6 +179,7 @@ export function ToolsPage() {
       store.onChange('sideIndicator', setSideIndicator),
       store.onChange('friendSmartGroup', setFriendSmartGroup),
       store.onChange('customProfileBg', setCustomProfileBg),
+      store.onChange('ignoreProfilePrivacy', setIgnoreProfilePrivacy),
       store.onChange('customBanner', setCustomBanner),
       store.onChange('autoHonor', setAutoHonor),
       store.onChange('autoLockChampion', setAutoLockChampion),
@@ -592,6 +594,15 @@ export function ToolsPage() {
           <SonaSwitch
             checked={customProfileBg}
             onChange={(v) => { setCustomProfileBg(v); store.set('customProfileBg', v) }}
+          />
+        </SettingCard>
+        <SettingCard
+          title="无视生涯隐私"
+          description="允许查看所有人召唤师生涯页面，修改开关后需要重启客户端才能生效。(ctrl+enter 快速重启客户端)"
+        >
+          <SonaSwitch
+            checked={ignoreProfilePrivacy}
+            onChange={(v) => { setIgnoreProfilePrivacy(v); store.set('ignoreProfilePrivacy', v) }}
           />
         </SettingCard>
         <SettingCard

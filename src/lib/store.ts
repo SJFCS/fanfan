@@ -66,6 +66,12 @@ export interface SonaConfig {
     spell2Id: number
     updatedAt: number
   }>
+  /** 游戏设置备份：按 puuid 保存多个命名备份 */
+  gameSettingsBackups: Record<string, Record<string, {
+    general?: unknown
+    input?: unknown
+    timestamp: number
+  }>>
   /** OP.GG 配装推荐段位过滤 */
   opggBuildRecommendationTier: string
   /** 分析友方战力（进入选人自动查战绩并发送到聊天框） */
@@ -88,6 +94,8 @@ export interface SonaConfig {
   friendSmartGroup: boolean
   /** 自定义生涯背景 */
   customProfileBg: boolean
+  /** 无视他人生涯隐私（XHR 响应改写，需重启生效） */
+  ignoreProfilePrivacy: boolean
   /** 自定义挑战旗帜 */
   customBanner: boolean
   /** 自定义挑战旗帜选择（仅本地显示） */
@@ -153,6 +161,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   smartBuildRecommendation: true,
   smartRunePages: {},
   smartSummonerSpells: {},
+  gameSettingsBackups: {},
   opggBuildRecommendationTier: 'emerald_plus',
   analyzeTeamPower: false,
   analyzeTeamPowerMsgType: 'celebration',
@@ -166,6 +175,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   hideTFT: false,
   hideRightNavText: false,
   customProfileBg: false,
+  ignoreProfilePrivacy: true,
   customBanner: false,
   customBannerSelection: null,
   autoHonor: false,
