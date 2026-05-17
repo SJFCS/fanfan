@@ -459,7 +459,7 @@ export function ToolsPage() {
         </SettingCard>
         <SettingCard
           title="英雄选择阶段增强"
-          description="英雄选择时显示粒子特效、队友近期胜率/KDA、英雄 T 级角标和备选席胜率；点击队友头像可查询近期战绩。"
+          description="英雄选择时显示粒子特效、队友近期胜率/KDA 和英雄 T 级角标；点击队友头像可查询近期战绩。"
         >
           <SonaSelect
             value={String(champSelectAssistFetchCount)}

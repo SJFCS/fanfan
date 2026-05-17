@@ -51,6 +51,7 @@ let lobbyMemberHistoryMap = new Map<string, LobbyMemberInfo>()
 let lobbyMemberHistoryQueueId = 0
 let lobbyMemberStatsMap = new Map<string, LobbyMemberStats>()
 let lobbyMemberStatsInFlight: Promise<void> | null = null
+let lobbyMemberNameMap = new Map<string, string>()
 let boundIdentities: BoundIdentity[] = []
 let matchModalRoot: Root | null = null
 let matchModalContainer: HTMLDivElement | null = null
@@ -82,6 +83,22 @@ function cleanupMatchHistoryModal() {
   if (matchModalContainer) {
     matchModalContainer.remove()
     matchModalContainer = null
+  }
+}
+
+async function getDisplayNameByPuuid(puuid: string, fallback: string): Promise<string> {
+  const cached = lobbyMemberNameMap.get(puuid)
+  if (cached) return cached
+
+  try {
+    const summoner = await lcu.getSummonerByPuuid(puuid)
+    const name = summoner.gameName && summoner.tagLine
+      ? `${summoner.gameName}#${summoner.tagLine}`
+      : fallback
+    lobbyMemberNameMap.set(puuid, name)
+    return name
+  } catch {
+    return fallback
   }
 }
 
@@ -297,7 +314,9 @@ function bindIdentityClick(identity: HTMLElement, info: LobbyMemberInfo) {
 
     event.preventDefault()
     event.stopPropagation()
-    showMatchHistoryModal(info.puuid, info.name, lobbyMemberHistoryQueueId || undefined)
+    void getDisplayNameByPuuid(info.puuid, info.name).then((displayName) => {
+      showMatchHistoryModal(info.puuid, displayName, lobbyMemberHistoryQueueId || undefined)
+    })
   }
 
   const moveHandler = (event: MouseEvent) => {
@@ -383,6 +402,7 @@ export function updateLobbyMemberMatchHistory(enabled: boolean) {
     lobbyMemberHistoryRegistered = false
     indexLobby(null)
     lobbyMemberStatsMap.clear()
+    lobbyMemberNameMap.clear()
     cleanupBoundIdentities()
     cleanupMatchHistoryModal()
 

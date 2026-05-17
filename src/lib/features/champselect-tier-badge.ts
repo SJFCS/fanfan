@@ -21,14 +21,12 @@ import tier4Icon from '@/../assets/tier/t4.svg'
 import tier5Icon from '@/../assets/tier/t5.svg'
 
 const BADGE_TARGETS = [
-  { selector: '.champion-grid-champion-thumbnail', size: 22, left: -2, top: 0, showWinRate: false },
-  { selector: '.champion-card-component-click-target', size: 22, left: -2, top: 0, showWinRate: false },
-  { selector: '.bench-champion-icon', size: 18, left: -2, top: -2, showWinRate: true },
+  { selector: '.champion-grid-champion-thumbnail', size: 22, left: -2, top: 0 },
+  { selector: '.champion-card-component-click-target', size: 22, left: -2, top: 0 },
 ]
 const PLAYER_ICON_BADGE_TARGET = { size: 20, left: -2, top: 'auto', bottom: -2 }
 const BADGE_TARGET_SELECTOR = BADGE_TARGETS.map((target) => target.selector).join(',')
 const BADGE_ATTR = 'data-sona-champ-tier-badge'
-const WIN_RATE_ATTR = 'data-sona-champ-tier-win-rate'
 const POSITION_ATTR = 'data-sona-original-position'
 const DEFAULT_OPGG_TIER: OpggTier = 'emerald_plus'
 const SELECTABLE_OPGG_TIERS: OpggTier[] = [
@@ -305,39 +303,6 @@ function createBadge(tier: number, target: { size: number; left: number; top?: n
   return badge
 }
 
-function normalizeWinRateForDisplay(winRate: number): number {
-  return winRate <= 1 ? winRate * 100 : winRate
-}
-
-function createWinRateText(winRate: number): HTMLSpanElement {
-  const text = document.createElement('span')
-  const displayRate = normalizeWinRateForDisplay(winRate)
-  text.setAttribute(WIN_RATE_ATTR, 'true')
-  text.textContent = `${displayRate.toFixed(1)}%`
-  text.style.cssText = [
-    'position:absolute',
-    'left:50%',
-    'bottom:-12px',
-    'transform:translateX(-50%)',
-    'z-index:12',
-    'pointer-events:none',
-    'font-size:10px',
-    'font-weight:700',
-    'line-height:1',
-    'white-space:nowrap',
-    `color:${displayRate >= 50 ? '#5bbd72' : '#e74c3c'}`,
-    'text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 4px rgba(0,0,0,.85)',
-  ].join(';')
-  return text
-}
-
-function getWinRateHost(element: HTMLElement, showWinRate: boolean): HTMLElement {
-  if (!showWinRate) return element
-
-  const benchContainer = element.closest('.bench-container')
-  return benchContainer instanceof HTMLElement ? benchContainer : element
-}
-
 function ensurePositionContext(thumbnail: HTMLElement) {
   const position = window.getComputedStyle(thumbnail).position
   if (position !== 'static') return
@@ -349,12 +314,6 @@ function ensurePositionContext(thumbnail: HTMLElement) {
 function getOwnBadge(element: HTMLElement): HTMLImageElement | null {
   return Array.from(element.children).find((child): child is HTMLImageElement => {
     return child instanceof HTMLImageElement && child.hasAttribute(BADGE_ATTR)
-  }) ?? null
-}
-
-function getOwnWinRateText(element: HTMLElement): HTMLSpanElement | null {
-  return Array.from(element.children).find((child): child is HTMLSpanElement => {
-    return child instanceof HTMLSpanElement && child.hasAttribute(WIN_RATE_ATTR)
   }) ?? null
 }
 
@@ -371,14 +330,10 @@ function tryInjectTierBadges(): boolean {
     const championId = extractChampionId(element)
     const stats = championId != null ? tierByChampionId.get(championId) : undefined
     const tier = stats?.tier
-    const winRate = stats?.winRate
     const existing = getOwnBadge(element)
-    const winRateHost = getWinRateHost(element, targetConfig.showWinRate)
-    const existingWinRate = getOwnWinRateText(winRateHost)
 
     if (!stats) {
       existing?.remove()
-      existingWinRate?.remove()
       return
     }
 
@@ -394,18 +349,6 @@ function tryInjectTierBadges(): boolean {
           element.appendChild(badge)
         }
       }
-    }
-
-    if (targetConfig.showWinRate && winRate != null) {
-      const nextText = `${normalizeWinRateForDisplay(winRate).toFixed(1)}%`
-      if (existingWinRate?.textContent !== nextText) {
-        existingWinRate?.remove()
-        ensurePositionContext(winRateHost)
-        winRateHost.style.overflow = 'visible'
-        winRateHost.appendChild(createWinRateText(winRate))
-      }
-    } else {
-      existingWinRate?.remove()
     }
   })
 
@@ -455,7 +398,6 @@ function getSelectedChampionId(player: ChampSelectSession['myTeam'][number]): nu
 
 function cleanupBadges() {
   document.querySelectorAll(`[${BADGE_ATTR}]`).forEach((badge) => badge.remove())
-  document.querySelectorAll(`[${WIN_RATE_ATTR}]`).forEach((winRate) => winRate.remove())
 
   document.querySelectorAll(`[${POSITION_ATTR}]`).forEach((element) => {
     if (element instanceof HTMLElement) {
