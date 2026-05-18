@@ -113,6 +113,7 @@ export function ProfileBackgroundPicker({ open, onClose }: ProfileBackgroundPick
   const [search, setSearch] = useState('')
   const [appliedId, setAppliedId] = useState<number | null>(null)
   const [statusMsg, setStatusMsg] = useState('')
+  const lastAutoScrolledIdRef = useRef<number | null>(null)
 
   // 加载皮肤数据
   useEffect(() => {
@@ -120,6 +121,8 @@ export function ProfileBackgroundPicker({ open, onClose }: ProfileBackgroundPick
     setLoading(true)
     setSkins([])
     setStatusMsg('')
+    setSearch('')
+    lastAutoScrolledIdRef.current = null
 
     ;(async () => {
       try {
@@ -188,6 +191,31 @@ export function ProfileBackgroundPicker({ open, onClose }: ProfileBackgroundPick
   const visibleSkins = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
   const hasMore = visibleCount < filtered.length
 
+  useEffect(() => {
+    if (!open || loading || search.trim() || !appliedId || filtered.length === 0) return
+    if (lastAutoScrolledIdRef.current === appliedId) return
+
+    const appliedIndex = filtered.findIndex((skin) => skin.id === appliedId)
+    if (appliedIndex < 0) return
+
+    if (appliedIndex >= visibleCount) {
+      setVisibleCount(Math.min(filtered.length, appliedIndex + PAGE_SIZE))
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      const container = gridWrapRef.current
+      const target = container?.querySelector(`[data-skin-id="${appliedId}"]`) as HTMLElement | null
+      if (!container || !target) return
+
+      const containerRect = container.getBoundingClientRect()
+      const targetRect = target.getBoundingClientRect()
+      const offset = targetRect.top - containerRect.top + container.scrollTop - 16
+      container.scrollTo({ top: Math.max(0, offset), behavior: 'auto' })
+      lastAutoScrolledIdRef.current = appliedId
+    })
+  }, [open, loading, search, appliedId, filtered, visibleCount])
+
   const handleScroll = useCallback(() => {
     const el = gridWrapRef.current
     if (!el || !hasMore) return
@@ -250,6 +278,7 @@ export function ProfileBackgroundPicker({ open, onClose }: ProfileBackgroundPick
               return (
                 <div
                   key={skin.id}
+                  data-skin-id={skin.id}
                   className={`spbg-card ${isApplied ? 'spbg-applied' : ''}`}
                   onClick={() => handleApply(skin)}
                 >
