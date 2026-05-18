@@ -29,8 +29,15 @@ export function DebugPage() {
   const [showChampSuggestions, setShowChampSuggestions] = useState(false)
   const [selectedChampId, setSelectedChampId] = useState(0)
   const [gameAnalysisOpen, setGameAnalysisOpen] = useState(false)
+  const [beautifyImagePreview, setBeautifyImagePreview] = useState<{
+    src: string
+    name: string
+    type: string
+    size: number
+  } | null>(null)
   const champRef = useRef<HTMLDivElement>(null)
   const opggPanelButtonRef = useRef<HTMLDivElement>(null)
+  const beautifyImageInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -51,6 +58,40 @@ export function DebugPage() {
     } catch (err) {
       setOutput(`❌ ${label}\n${String(err)}`)
     }
+  }
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+  }
+
+  const handleBeautifyImageSelected = (file: File | null) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setOutput(`❌ 请选择图片文件，当前文件类型: ${file.type || '未知'}`)
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        setOutput('❌ 图片读取失败：FileReader 没有返回可用的 Data URL')
+        return
+      }
+
+      setBeautifyImagePreview({
+        src: reader.result,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      })
+      setOutput(`✅ 已读取图片\n${file.name}\n${file.type} · ${formatBytes(file.size)}`)
+    }
+    reader.onerror = () => {
+      setOutput(`❌ 图片读取失败\n${reader.error?.message ?? '未知错误'}`)
+    }
+    reader.readAsDataURL(file)
   }
 
   const testOpggConnectivity = async () => {
@@ -288,6 +329,40 @@ export function DebugPage() {
   return (
     <div className="sona-settings">
       <h2 className="sona-settings-title">调试面板</h2>
+
+      <SettingGroup title="美化客户端相关">
+        <p className="sona-subtitle">
+          测试客户端环境能否通过文件选择器读取本地图片；当前仅用于预览，不会写入磁盘或修改头像。
+        </p>
+        <input
+          ref={beautifyImageInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(event) => {
+            handleBeautifyImageSelected(event.currentTarget.files?.[0] ?? null)
+            event.currentTarget.value = ''
+          }}
+        />
+        <div className="sona-debug-actions">
+          <SonaButton variant="primary" onClick={() => beautifyImageInputRef.current?.click()}>
+            选择图片
+          </SonaButton>
+          {beautifyImagePreview && (
+            <SonaButton variant="secondary" onClick={() => setBeautifyImagePreview(null)}>
+              清除预览
+            </SonaButton>
+          )}
+        </div>
+        {beautifyImagePreview && (
+          <div className="sona-debug-image-preview">
+            <div className="sona-debug-image-meta">
+              {beautifyImagePreview.name} · {beautifyImagePreview.type} · {formatBytes(beautifyImagePreview.size)}
+            </div>
+            <img src={beautifyImagePreview.src} alt="本地图片预览" />
+          </div>
+        )}
+      </SettingGroup>
 
       <SettingGroup title="LCU API 测试">
         <div className="sona-debug-actions">
