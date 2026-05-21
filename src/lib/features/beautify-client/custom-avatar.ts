@@ -1,17 +1,28 @@
-import { logger } from '@/index'
 import { injector } from '@/lib/InjectorManager'
+import { lcu } from '@/lib/lcu'
 import { store } from '@/lib/store'
 
 const FRIEND_AVATAR_SELECTOR = 'lol-uikit-radial-progress img.icon-image'
-const REGALIA_AVATAR_SELECTOR = [
-  'lol-regalia-crest-v2-element.regalia-parties-v2-crest-element',
-  'lol-regalia-crest-v2-element.regalia-profile-crest-element',
-].join(',')
+const REGALIA_PARTY_ANY_HOST_SELECTOR = 'lol-regalia-parties-v2-element'
+const REGALIA_PARTY_HOST_SELECTOR = 'lol-regalia-parties-v2-element[member-type="current-player"]'
+const REGALIA_HOVERCARD_HOST_SELECTOR = 'lol-regalia-hovercard-v2-element'
+const REGALIA_PROFILE_HOST_SELECTOR = 'lol-regalia-profile-v2-element'
+const REGALIA_AVATAR_SELECTOR = 'lol-regalia-crest-v2-element'
+const REGALIA_PROFILE_AVATAR_SELECTOR = 'lol-regalia-crest-v2-element.regalia-profile-crest-element'
 const PROFILE_ICON_ATTR = 'profile-icon-url'
+const MEMBER_TYPE_ATTR = 'member-type'
+const PUUID_ATTR = 'puuid'
 
 let customAvatarRegistered = false
 let customAvatarObserver: MutationObserver | null = null
 let customAvatarRaf = 0
+let ownPuuidCache = ''
+let ownPuuidPromise: Promise<string> | null = null
+const friendImageObservers = new Map<HTMLImageElement, MutationObserver>()
+const regaliaElementObservers = new Map<Element, MutationObserver>()
+const regaliaPartyHostObservers = new Map<Element, MutationObserver>()
+const regaliaHovercardHostObservers = new Map<Element, MutationObserver>()
+const regaliaShadowRootObservers = new Map<ShadowRoot, MutationObserver>()
 
 const patchedFriendImages = new Set<HTMLImageElement>()
 const patchedRegaliaElements = new Set<Element>()
@@ -27,7 +38,112 @@ function getCurrentAvatarUrl(): string {
   return assetPath ? getAssetUrl(assetPath) : ''
 }
 
+function getOwnPuuid(): string {
+  if (ownPuuidCache) return ownPuuidCache
+
+  ownPuuidPromise ??= lcu.getSummonerInfo()
+    .then((summoner) => {
+      ownPuuidCache = summoner.puuid.toLowerCase()
+      scheduleApplyCustomAvatar()
+      return ownPuuidCache
+    })
+    .catch(() => {
+      ownPuuidPromise = null
+      return ''
+    })
+
+  return ''
+}
+
+function isOwnPuuidHost(host: Element): boolean {
+  const hostPuuid = host.getAttribute(PUUID_ATTR)?.toLowerCase()
+  if (!hostPuuid) return false
+
+  const ownPuuid = getOwnPuuid()
+  if (!ownPuuid) return false
+
+  return hostPuuid === ownPuuid
+}
+
+function observeFriendImage(image: HTMLImageElement) {
+  if (friendImageObservers.has(image)) return
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.attributeName === 'src') {
+        scheduleApplyCustomAvatar()
+        return
+      }
+    }
+  })
+
+  observer.observe(image, {
+    attributes: true,
+    attributeFilter: ['src'],
+  })
+  friendImageObservers.set(image, observer)
+}
+
+function observeRegaliaAvatarElement(element: Element) {
+  if (regaliaElementObservers.has(element)) return
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.attributeName === PROFILE_ICON_ATTR) {
+        scheduleApplyCustomAvatar()
+        return
+      }
+    }
+  })
+
+  observer.observe(element, {
+    attributes: true,
+    attributeFilter: [PROFILE_ICON_ATTR],
+  })
+  regaliaElementObservers.set(element, observer)
+}
+
+function observeRegaliaPartyHost(host: Element) {
+  if (regaliaPartyHostObservers.has(host)) return
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.attributeName === MEMBER_TYPE_ATTR) {
+        scheduleApplyCustomAvatar()
+        return
+      }
+    }
+  })
+
+  observer.observe(host, {
+    attributes: true,
+    attributeFilter: [MEMBER_TYPE_ATTR],
+  })
+  regaliaPartyHostObservers.set(host, observer)
+}
+
+function observeRegaliaHovercardHost(host: Element) {
+  if (regaliaHovercardHostObservers.has(host)) return
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.attributeName === PUUID_ATTR) {
+        scheduleApplyCustomAvatar()
+        return
+      }
+    }
+  })
+
+  observer.observe(host, {
+    attributes: true,
+    attributeFilter: [PUUID_ATTR],
+  })
+  regaliaHovercardHostObservers.set(host, observer)
+}
+
 function patchFriendAvatar(image: HTMLImageElement, avatarUrl: string): boolean {
+  observeFriendImage(image)
+
   if (!originalFriendImageSrc.has(image)) {
     originalFriendImageSrc.set(image, image.getAttribute('src'))
   }
@@ -40,6 +156,8 @@ function patchFriendAvatar(image: HTMLImageElement, avatarUrl: string): boolean 
 }
 
 function patchRegaliaAvatar(element: Element, avatarUrl: string): boolean {
+  observeRegaliaAvatarElement(element)
+
   if (!originalRegaliaProfileIconUrl.has(element)) {
     originalRegaliaProfileIconUrl.set(element, element.getAttribute(PROFILE_ICON_ATTR))
   }
@@ -52,6 +170,74 @@ function patchRegaliaAvatar(element: Element, avatarUrl: string): boolean {
   return true
 }
 
+function observeRegaliaShadowRoot(shadowRoot: ShadowRoot) {
+  if (regaliaShadowRootObservers.has(shadowRoot)) return
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList' || mutation.attributeName === PROFILE_ICON_ATTR) {
+        scheduleApplyCustomAvatar()
+        return
+      }
+    }
+  })
+
+  observer.observe(shadowRoot, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: [PROFILE_ICON_ATTR],
+  })
+
+  regaliaShadowRootObservers.set(shadowRoot, observer)
+}
+
+function queryRegaliaAvatarElements(): Element[] {
+  const elements = new Set<Element>()
+
+  document.querySelectorAll(REGALIA_PROFILE_AVATAR_SELECTOR).forEach((element) => {
+    elements.add(element)
+  })
+
+  document.querySelectorAll<HTMLElement>(REGALIA_PARTY_ANY_HOST_SELECTOR).forEach((host) => {
+    observeRegaliaPartyHost(host)
+    if (!host.matches(REGALIA_PARTY_HOST_SELECTOR)) return
+
+    const shadowRoot = host.shadowRoot
+    if (!shadowRoot) return
+
+    observeRegaliaShadowRoot(shadowRoot)
+    shadowRoot.querySelectorAll(REGALIA_AVATAR_SELECTOR).forEach((element) => {
+      elements.add(element)
+    })
+  })
+
+  document.querySelectorAll<HTMLElement>(REGALIA_HOVERCARD_HOST_SELECTOR).forEach((host) => {
+    observeRegaliaHovercardHost(host)
+    if (!isOwnPuuidHost(host)) return
+
+    const shadowRoot = host.shadowRoot
+    if (!shadowRoot) return
+
+    observeRegaliaShadowRoot(shadowRoot)
+    shadowRoot.querySelectorAll(REGALIA_AVATAR_SELECTOR).forEach((element) => {
+      elements.add(element)
+    })
+  })
+
+  document.querySelectorAll<HTMLElement>(REGALIA_PROFILE_HOST_SELECTOR).forEach((host) => {
+    const shadowRoot = host.shadowRoot
+    if (!shadowRoot) return
+
+    observeRegaliaShadowRoot(shadowRoot)
+    shadowRoot.querySelectorAll(REGALIA_AVATAR_SELECTOR).forEach((element) => {
+      elements.add(element)
+    })
+  })
+
+  return [...elements]
+}
+
 function applyCustomAvatar(): boolean {
   const avatarUrl = getCurrentAvatarUrl()
   if (!avatarUrl) return false
@@ -62,7 +248,7 @@ function applyCustomAvatar(): boolean {
     changed = patchFriendAvatar(image, avatarUrl) || changed
   })
 
-  document.querySelectorAll(REGALIA_AVATAR_SELECTOR).forEach((element) => {
+  queryRegaliaAvatarElements().forEach((element) => {
     changed = patchRegaliaAvatar(element, avatarUrl) || changed
   })
 
@@ -83,7 +269,7 @@ function startCustomAvatarObserver() {
 
   customAvatarObserver = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
-      if (mutation.type === 'childList' || mutation.attributeName === 'src' || mutation.attributeName === PROFILE_ICON_ATTR) {
+      if (mutation.type === 'childList') {
         scheduleApplyCustomAvatar()
         return
       }
@@ -93,8 +279,6 @@ function startCustomAvatarObserver() {
   customAvatarObserver.observe(document.body, {
     childList: true,
     subtree: true,
-    attributes: true,
-    attributeFilter: ['src', PROFILE_ICON_ATTR],
   })
 }
 
@@ -135,6 +319,16 @@ function disableCustomAvatar() {
     customAvatarObserver.disconnect()
     customAvatarObserver = null
   }
+  friendImageObservers.forEach((observer) => observer.disconnect())
+  friendImageObservers.clear()
+  regaliaElementObservers.forEach((observer) => observer.disconnect())
+  regaliaElementObservers.clear()
+  regaliaPartyHostObservers.forEach((observer) => observer.disconnect())
+  regaliaPartyHostObservers.clear()
+  regaliaHovercardHostObservers.forEach((observer) => observer.disconnect())
+  regaliaHovercardHostObservers.clear()
+  regaliaShadowRootObservers.forEach((observer) => observer.disconnect())
+  regaliaShadowRootObservers.clear()
 
   if (customAvatarRaf) {
     cancelAnimationFrame(customAvatarRaf)
@@ -147,9 +341,7 @@ function disableCustomAvatar() {
 export function updateBeautifyCustomAvatar() {
   if (getCurrentAvatarUrl()) {
     enableCustomAvatar()
-    logger.info('[BeautifyAvatar] 自定义头像已启用')
   } else {
     disableCustomAvatar()
-    logger.info('[BeautifyAvatar] 自定义头像已禁用')
   }
 }
