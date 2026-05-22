@@ -27,6 +27,20 @@ const CARD_PROCESSED_ATTR = 'data-sona-mode-filter'
 /** card 被我们隐藏时打的标记 */
 const CARD_HIDDEN_ATTR = 'data-sona-mode-hidden'
 
+/** card 动画状态 */
+const CARD_ANIMATION_STATE_ATTR = 'data-sona-mode-animation'
+
+/** card 动画方向 */
+const CARD_ANIMATION_DIRECTION_ATTR = 'data-sona-mode-direction'
+
+/** 卡片隐藏动画时长，需与 CSS transition 保持一致 */
+const CARD_HIDE_ANIMATION_MS = 240
+
+/** 布局重排补间动画时长 */
+const CARD_LAYOUT_ANIMATION_MS = 260
+
+const CARD_GHOST_CLASS = 'sona-game-mode-card-ghost'
+
 // ==================== 工具：从 .game-type-card 提取信息 ====================
 
 interface GameModeInfo {
@@ -115,21 +129,148 @@ function tryInjectGameModeFilter(): boolean {
 /** 根据 store.hiddenGameModes 应用 .game-type-card 的可见性 */
 function applyVisibility(cards: HTMLElement[]) {
   const hidden = store.get('hiddenGameModes')
-  for (const card of cards) {
+  const middleIndex = (cards.length - 1) / 2
+  cards.forEach((card, index) => {
+    card.setAttribute(CARD_ANIMATION_DIRECTION_ATTR, index <= middleIndex ? 'left' : 'right')
     const mode = card.getAttribute('data-game-mode') || ''
     const shouldHide = hidden[mode] === true
     if (shouldHide) {
-      if (card.style.display !== 'none') {
-        card.style.display = 'none'
-        card.setAttribute(CARD_HIDDEN_ATTR, 'true')
-      }
+      hideCard(card)
     } else {
-      if (card.hasAttribute(CARD_HIDDEN_ATTR)) {
-        card.style.display = ''
-        card.removeAttribute(CARD_HIDDEN_ATTR)
-      }
+      showCard(card)
     }
+  })
+}
+
+function shouldCardBeHidden(card: HTMLElement): boolean {
+  const mode = card.getAttribute('data-game-mode') || ''
+  return store.get('hiddenGameModes')[mode] === true
+}
+
+function getLayoutCards(card: HTMLElement): HTMLElement[] {
+  const host = card.closest('.parties-game-type-select-wrapper')
+  if (!host) return []
+
+  return Array.from(host.querySelectorAll<HTMLElement>('.game-type-card'))
+}
+
+function measureVisibleCards(cards: HTMLElement[], excludedCard?: HTMLElement): Map<HTMLElement, DOMRect> {
+  const rects = new Map<HTMLElement, DOMRect>()
+  cards.forEach((card) => {
+    if (card === excludedCard || card.style.display === 'none') return
+    rects.set(card, card.getBoundingClientRect())
+  })
+  return rects
+}
+
+function animateLayoutShift(beforeRects: Map<HTMLElement, DOMRect>, excludedCard?: HTMLElement) {
+  beforeRects.forEach((beforeRect, card) => {
+    if (card === excludedCard || !card.isConnected || card.style.display === 'none') return
+
+    const afterRect = card.getBoundingClientRect()
+    const deltaX = beforeRect.left - afterRect.left
+    const deltaY = beforeRect.top - afterRect.top
+    if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return
+
+    card.animate(
+      [
+        { transform: `translate(${deltaX}px, ${deltaY}px)` },
+        { transform: 'translate(0, 0)' },
+      ],
+      {
+        duration: CARD_LAYOUT_ANIMATION_MS,
+        easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      },
+    )
+  })
+}
+
+function createHideGhost(card: HTMLElement) {
+  const rect = card.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return
+
+  const direction = card.getAttribute(CARD_ANIMATION_DIRECTION_ATTR) === 'left' ? 'left' : 'right'
+  const ghost = card.cloneNode(true) as HTMLElement
+  ghost.classList.add(CARD_GHOST_CLASS)
+  ghost.removeAttribute('id')
+  ghost.removeAttribute(CARD_HIDDEN_ATTR)
+  ghost.setAttribute(CARD_ANIMATION_STATE_ATTR, 'visible')
+  ghost.setAttribute(CARD_ANIMATION_DIRECTION_ATTR, direction)
+
+  Object.assign(ghost.style, {
+    position: 'fixed',
+    left: `${rect.left}px`,
+    top: `${rect.top}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    margin: '0',
+    pointerEvents: 'none',
+    zIndex: '20',
+  })
+
+  document.body.appendChild(ghost)
+
+  const translateX = direction === 'left' ? -32 : 32
+  const animation = ghost.animate(
+    [
+      { opacity: 1, transform: 'translateX(0) scale(1)', filter: 'blur(0)' },
+      { opacity: 0, transform: `translateX(${translateX}px) scale(0.96)`, filter: 'blur(2px)' },
+    ],
+    {
+      duration: CARD_HIDE_ANIMATION_MS,
+      easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      fill: 'forwards',
+    },
+  )
+
+  let cleaned = false
+  const cleanup = () => {
+    if (cleaned) return
+    cleaned = true
+    ghost.remove()
   }
+  animation.onfinish = cleanup
+  animation.oncancel = cleanup
+  window.setTimeout(cleanup, CARD_HIDE_ANIMATION_MS + 80)
+}
+
+function showCard(card: HTMLElement) {
+  card.setAttribute(CARD_PROCESSED_ATTR, 'true')
+
+  if (card.style.display === 'none' || card.hasAttribute(CARD_HIDDEN_ATTR)) {
+    const beforeRects = measureVisibleCards(getLayoutCards(card), card)
+    card.style.display = ''
+    card.removeAttribute(CARD_HIDDEN_ATTR)
+    card.setAttribute(CARD_ANIMATION_STATE_ATTR, 'showing')
+    card.getBoundingClientRect()
+    animateLayoutShift(beforeRects, card)
+
+    requestAnimationFrame(() => {
+      if (!card.isConnected || card.hasAttribute(CARD_HIDDEN_ATTR)) return
+      card.setAttribute(CARD_ANIMATION_STATE_ATTR, 'visible')
+    })
+    return
+  }
+
+  if (card.getAttribute(CARD_ANIMATION_STATE_ATTR) !== 'visible') {
+    card.setAttribute(CARD_ANIMATION_STATE_ATTR, 'visible')
+  }
+}
+
+function hideCard(card: HTMLElement) {
+  card.setAttribute(CARD_PROCESSED_ATTR, 'true')
+  if (card.hasAttribute(CARD_HIDDEN_ATTR) && card.style.display === 'none') return
+
+  if (!shouldCardBeHidden(card)) return
+
+  const beforeRects = measureVisibleCards(getLayoutCards(card), card)
+  createHideGhost(card)
+  card.style.display = ''
+  card.setAttribute(CARD_HIDDEN_ATTR, 'true')
+  card.removeAttribute(CARD_ANIMATION_STATE_ATTR)
+  card.style.display = 'none'
+  card.getBoundingClientRect()
+  animateLayoutShift(beforeRects, card)
 }
 
 /** 创建（或更新）勾选条 */
@@ -257,7 +398,18 @@ function restoreAllCards() {
   hidden.forEach((card) => {
     card.style.display = ''
     card.removeAttribute(CARD_HIDDEN_ATTR)
+    card.removeAttribute(CARD_ANIMATION_STATE_ATTR)
+    card.removeAttribute(CARD_ANIMATION_DIRECTION_ATTR)
   })
+
+  document.querySelectorAll<HTMLElement>(`.game-type-card[${CARD_ANIMATION_STATE_ATTR}]`).forEach((card) => {
+    card.style.display = ''
+    card.removeAttribute(CARD_HIDDEN_ATTR)
+    card.removeAttribute(CARD_ANIMATION_STATE_ATTR)
+    card.removeAttribute(CARD_ANIMATION_DIRECTION_ATTR)
+  })
+
+  document.querySelectorAll<HTMLElement>(`.${CARD_GHOST_CLASS}`).forEach((ghost) => ghost.remove())
 }
 
 // ==================== 注册 ====================

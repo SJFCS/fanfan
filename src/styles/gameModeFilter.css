@@ -72,3 +72,34 @@
 .sona-mode-chip--on .sona-mode-chip__name {
   color: #f0e6d2;
 }
+
+.game-type-card[data-sona-mode-filter="true"] {
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.24s ease;
+  will-change: opacity, transform, filter;
+}
+
+.game-type-card[data-sona-mode-animation="visible"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+}
+
+.game-type-card[data-sona-mode-animation="showing"],
+.game-type-card[data-sona-mode-animation="hiding"] {
+  opacity: 0;
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.game-type-card[data-sona-mode-direction="left"][data-sona-mode-animation="showing"],
+.game-type-card[data-sona-mode-direction="left"][data-sona-mode-animation="hiding"] {
+  transform: translateX(-32px) scale(0.96);
+}
+
+.game-type-card[data-sona-mode-direction="right"][data-sona-mode-animation="showing"],
+.game-type-card[data-sona-mode-direction="right"][data-sona-mode-animation="hiding"] {
+  transform: translateX(32px) scale(0.96);
+}
