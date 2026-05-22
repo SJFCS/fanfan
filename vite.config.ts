@@ -84,7 +84,6 @@ function penguServe(): Plugin {
  * Pengu Loader Build Plugin
  * - Patches asset paths for PenguLoader's plugin protocol
  * - Wraps code for proper load timing
- * - Copies build output to plugins directory
  */
 function penguBuild(): Plugin {
   let config: ResolvedConfig
@@ -124,7 +123,7 @@ function penguBuild(): Plugin {
           ' * @name Sona',
           ` * @version ${pkg.version}`,
           ' * @description 基于 Pengu Loader 的全服可用英雄联盟客户端增强插件',
-          ' * @author WJZ_P',
+          ' * @author 学会用手吃饭饭',
           ' * @link https://github.com/WJZ-P/sona',
           ' */',
           '',
@@ -133,43 +132,7 @@ function penguBuild(): Plugin {
 
         fs.writeFileSync(jsPath, js)
       }
-
-      // Process index.css - fix asset paths
-      const cssPath = path.join(outDir, 'index.css')
-      if (fs.existsSync(cssPath)) {
-        let css = fs.readFileSync(cssPath, 'utf-8')
-        css = css.replaceAll('url(/assets/', 'url(./assets/')
-        fs.writeFileSync(cssPath, css)
-      }
-
-      // Copy build output to plugins directory (skip if it's the project root)
-      const projectRoot = path.resolve(__dirname)
-      if (path.resolve(PLUGINS_DIR) === projectRoot) {
-        // Target is the project itself — just move dist contents to project root
-        copyDirSync(outDir, projectRoot)
-        console.log(`\n  ✅ Plugin "${PLUGIN_NAME}" built in-place (project root)\n`)
-      } else {
-        if (fs.existsSync(PLUGINS_DIR)) {
-          fs.rmSync(PLUGINS_DIR, { recursive: true })
-        }
-        fs.mkdirSync(PLUGINS_DIR, { recursive: true })
-        copyDirSync(outDir, PLUGINS_DIR)
-        console.log(`\n  ✅ Plugin "${PLUGIN_NAME}" built to ${PLUGINS_DIR}\n`)
-      }
     },
-  }
-}
-
-function copyDirSync(src: string, dest: string) {
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name)
-    const destPath = path.join(dest, entry.name)
-    if (entry.isDirectory()) {
-      fs.mkdirSync(destPath, { recursive: true })
-      copyDirSync(srcPath, destPath)
-    } else {
-      fs.copyFileSync(srcPath, destPath)
-    }
   }
 }
 
@@ -195,7 +158,7 @@ export default defineConfig({
     origin: 'https://localhost:3000',// 必须加这个，否则引入图片资源等会失败
   },
   build: {
-    outDir: 'dist',
+    outDir: 'package_build_src\\{app}\\Pengu\\.pengu\\plugins\\sona',
     lib: {
       entry: path.resolve(__dirname, 'src/index.tsx'),
       formats: ['es'],

@@ -3,6 +3,10 @@ node_modules/
 
 # Build output
 dist/
+build/
+package_build_src/{app}/Pengu/.pengu/plugins/sona/index.css
+package_build_src/{app}/Pengu/.pengu/plugins/sona/index.js
+package_build_src/{output}
 
 # Vite
 *.local

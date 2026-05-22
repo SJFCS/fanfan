@@ -1,18 +1,17 @@
 {
-  "name": "sona",
+  "name": "fanfan",
   "private": true,
   "version": "1.4.1",
   "type": "module",
-  "description": "Sona - A League of Legends client plugin for Pengu Loader",
+  "description": "FanFan - A League of Legends client plugin for Pengu Loader",
   "license": "AGPL-3.0",
   "config": {
-    "pluginName": "sona",
+    "pluginName": "fanfan",
     "loaderPath": "../../"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
+    "dev": "tsc && vite build&& powershell -NoProfile -ExecutionPolicy Bypass -File ./package_build_src/dev.ps1",
+    "build": "tsc && vite build&& powershell -NoProfile -ExecutionPolicy Bypass -File ./package_build_src/build.ps1",
     "update-balance": "tsx scripts/update-champion-balance.ts"
   },
   "dependencies": {
