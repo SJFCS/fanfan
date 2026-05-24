@@ -1,11 +1,13 @@
 import { injector } from '@/lib/InjectorManager'
+import { logger } from '@/index'
 import { lcu } from '@/lib/lcu'
 import { resolvePluginAssetUrl } from '@/lib/plugin-resolver'
+import { getSonaAvatarUrls, uploadSonaAvatar } from '@/lib/sona-service'
 import { store } from '@/lib/store'
+import type { ChatFriend } from '@/lib/lcu'
 
 const FRIEND_AVATAR_SELECTOR = 'lol-uikit-radial-progress img.icon-image'
 const REGALIA_PARTY_ANY_HOST_SELECTOR = 'lol-regalia-parties-v2-element'
-const REGALIA_PARTY_HOST_SELECTOR = 'lol-regalia-parties-v2-element[member-type="current-player"]'
 const REGALIA_HOVERCARD_HOST_SELECTOR = 'lol-regalia-hovercard-v2-element'
 const REGALIA_PROFILE_HOST_SELECTOR = 'lol-regalia-profile-v2-element'
 const REGALIA_AVATAR_SELECTOR = 'lol-regalia-crest-v2-element'
@@ -13,12 +15,20 @@ const REGALIA_PROFILE_AVATAR_SELECTOR = 'lol-regalia-crest-v2-element.regalia-pr
 const PROFILE_ICON_ATTR = 'profile-icon-url'
 const MEMBER_TYPE_ATTR = 'member-type'
 const PUUID_ATTR = 'puuid'
+const DATA_PUUID_ATTR = 'data-puuid'
+const SOCIAL_MEMBER_SELECTOR = '[class*="lol-social-roster-member"]'
+const SOCIAL_MEMBER_NAME_SELECTOR = '.member-name'
+const FRIENDS_URI = '/lol-chat/v1/friends'
 
 let customAvatarRegistered = false
 let customAvatarObserver: MutationObserver | null = null
 let customAvatarRaf = 0
 let ownPuuidCache = ''
 let ownPuuidPromise: Promise<string> | null = null
+let friendPuuidMapPromise: Promise<void> | null = null
+let friendPuuidMapUpdatedAt = 0
+let friendAvatarUnsub: (() => void) | null = null
+let friendAvatarRefreshTimer: number | null = null
 const friendImageObservers = new Map<HTMLImageElement, MutationObserver>()
 const regaliaElementObservers = new Map<Element, MutationObserver>()
 const regaliaPartyHostObservers = new Map<Element, MutationObserver>()
@@ -29,6 +39,13 @@ const patchedFriendImages = new Set<HTMLImageElement>()
 const patchedRegaliaElements = new Set<Element>()
 const originalFriendImageSrc = new WeakMap<HTMLImageElement, string | null>()
 const originalRegaliaProfileIconUrl = new WeakMap<Element, string | null>()
+const patchedFriendImagePuuid = new WeakMap<HTMLImageElement, string>()
+const patchedRegaliaElementPuuid = new WeakMap<Element, string>()
+const remoteAvatarCache = new Map<string, string | null>(
+  Object.entries(store.get('customAvatarRemoteCache')),
+)
+const friendPuuidByName = new Map<string, string>()
+const knownFriendPuuids = new Set<string>()
 
 function getAssetUrl(assetPath: string): string {
   return resolvePluginAssetUrl(assetPath)
@@ -37,6 +54,181 @@ function getAssetUrl(assetPath: string): string {
 function getCurrentAvatarUrl(): string {
   const [assetPath] = store.get('customAvatarAssetPaths')
   return assetPath ? getAssetUrl(assetPath) : ''
+}
+
+function normalizePuuid(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase()
+}
+
+function getPuuidFromElement(element: Element | null): string {
+  if (!element) return ''
+
+  const direct = normalizePuuid(element.getAttribute(PUUID_ATTR) || element.getAttribute(DATA_PUUID_ATTR))
+  if (direct) return direct
+
+  const parent = element.closest(`[${PUUID_ATTR}], [${DATA_PUUID_ATTR}]`)
+  return normalizePuuid(parent?.getAttribute(PUUID_ATTR) || parent?.getAttribute(DATA_PUUID_ATTR))
+}
+
+function getHostForElementInShadow(element: Element): Element | null {
+  const root = element.getRootNode()
+  return root instanceof ShadowRoot ? root.host : null
+}
+
+function getRegaliaElementPuuid(element: Element): string {
+  const shadowHost = getHostForElementInShadow(element)
+  const directHostPuuid = getPuuidFromElement(shadowHost)
+  if (directHostPuuid) return directHostPuuid
+
+  const profileHost = element.closest(REGALIA_PROFILE_HOST_SELECTOR)
+  return getPuuidFromElement(profileHost)
+}
+
+function indexFriendPuuid(friend: ChatFriend) {
+  const puuid = normalizePuuid(friend.puuid)
+  if (!puuid) return
+
+  const keys = [
+    friend.name,
+    friend.gameName,
+    friend.gameName && friend.gameTag ? `${friend.gameName}#${friend.gameTag}` : '',
+  ]
+
+  keys.forEach((key) => {
+    const normalized = key?.trim()
+    if (normalized) friendPuuidByName.set(normalized, puuid)
+  })
+}
+
+function getFriendImagePuuid(image: HTMLImageElement): string {
+  const attrPuuid = getPuuidFromElement(image)
+  if (attrPuuid) return attrPuuid
+
+  const member = image.closest(SOCIAL_MEMBER_SELECTOR)
+  const name = member?.querySelector(SOCIAL_MEMBER_NAME_SELECTOR)?.textContent?.trim()
+  if (!name) return ''
+
+  const cached = friendPuuidByName.get(name)
+  if (cached) return cached
+
+  return ''
+}
+
+function persistRemoteAvatarCacheEntry(puuid: string, avatarUrl: string | null) {
+  const current = { ...store.get('customAvatarRemoteCache') }
+  if (avatarUrl) {
+    current[puuid] = avatarUrl
+  } else {
+    delete current[puuid]
+  }
+  store.set('customAvatarRemoteCache', current)
+}
+
+function persistRemoteAvatarCacheEntries(avatarUrls: Record<string, string>, queriedPuuids: string[]) {
+  const current = { ...store.get('customAvatarRemoteCache') }
+
+  queriedPuuids.forEach((puuid) => {
+    const avatarUrl = avatarUrls[puuid]
+    if (avatarUrl) {
+      remoteAvatarCache.set(puuid, avatarUrl)
+      current[puuid] = avatarUrl
+    } else {
+      remoteAvatarCache.set(puuid, null)
+      delete current[puuid]
+    }
+  })
+
+  store.set('customAvatarRemoteCache', current)
+}
+
+async function syncRemoteAvatarsForPuuids(puuids: string[], reason: string) {
+  const uniquePuuids = [...new Set(puuids.map(normalizePuuid).filter(Boolean))]
+  if (uniquePuuids.length === 0) return
+
+  logger.info('[CustomAvatarSync] 批量查询头像缓存：%s，共 %d 个 PUUID', reason, uniquePuuids.length)
+  try {
+    const avatarUrls = await getSonaAvatarUrls(uniquePuuids)
+    persistRemoteAvatarCacheEntries(avatarUrls, uniquePuuids)
+    logger.info('[CustomAvatarSync] 批量头像查询完成：命中 %d/%d', Object.keys(avatarUrls).length, uniquePuuids.length)
+    scheduleApplyCustomAvatar()
+  } catch (err) {
+    logger.error('[CustomAvatarSync] 批量头像查询失败：%s', reason, err)
+  }
+}
+
+function updateFriendPuuidIndexes(friends: ChatFriend[]): Set<string> {
+  const nextPuuids = new Set<string>()
+  friendPuuidByName.clear()
+
+  friends.forEach((friend) => {
+    const puuid = normalizePuuid(friend.puuid)
+    if (puuid) nextPuuids.add(puuid)
+    indexFriendPuuid(friend)
+  })
+
+  friendPuuidMapUpdatedAt = Date.now()
+  scheduleApplyCustomAvatar()
+  return nextPuuids
+}
+
+function getFriendFromWsData(data: unknown): ChatFriend | null {
+  if (!data || typeof data !== 'object') return null
+
+  const friend = data as ChatFriend
+  return normalizePuuid(friend.puuid) ? friend : null
+}
+
+function refreshFriendAvatarCache(forceAll: boolean, reason: string) {
+  if (friendPuuidMapPromise) return friendPuuidMapPromise
+
+  friendPuuidMapPromise = lcu.getFriends()
+    .then(async (friends) => {
+      const nextPuuids = updateFriendPuuidIndexes(friends)
+      const targetPuuids = forceAll
+        ? [...nextPuuids]
+        : [...nextPuuids].filter((puuid) => !knownFriendPuuids.has(puuid))
+
+      knownFriendPuuids.clear()
+      nextPuuids.forEach((puuid) => knownFriendPuuids.add(puuid))
+
+      //logger.info('[CustomAvatarSync] 好友列表刷新：%s，好友 PUUID %d 个，待查询 %d 个', reason, nextPuuids.size, targetPuuids.length)
+      await syncRemoteAvatarsForPuuids(targetPuuids, reason)
+    })
+    .catch((err) => {
+      friendPuuidMapUpdatedAt = 0
+      logger.error('[CustomAvatarSync] 刷新好友列表失败：%s', reason, err)
+    })
+    .finally(() => {
+      friendPuuidMapPromise = null
+    })
+
+  return friendPuuidMapPromise
+}
+
+function scheduleFriendAvatarRefresh(reason: string, forceAll = false, delay = 500) {
+  if (friendAvatarRefreshTimer != null) {
+    window.clearTimeout(friendAvatarRefreshTimer)
+  }
+
+  friendAvatarRefreshTimer = window.setTimeout(() => {
+    friendAvatarRefreshTimer = null
+    void refreshFriendAvatarCache(forceAll, reason)
+  }, delay)
+}
+
+function getAvatarUrlForPuuid(puuid: string): string | null | undefined {
+  const normalizedPuuid = normalizePuuid(puuid)
+  if (!normalizedPuuid) return null
+
+  if (normalizedPuuid === getOwnPuuid()) {
+    return getCurrentAvatarUrl() || null
+  }
+
+  if (remoteAvatarCache.has(normalizedPuuid)) {
+    return remoteAvatarCache.get(normalizedPuuid)
+  }
+
+  return undefined
 }
 
 function getOwnPuuid(): string {
@@ -54,16 +246,6 @@ function getOwnPuuid(): string {
     })
 
   return ''
-}
-
-function isOwnPuuidHost(host: Element): boolean {
-  const hostPuuid = host.getAttribute(PUUID_ATTR)?.toLowerCase()
-  if (!hostPuuid) return false
-
-  const ownPuuid = getOwnPuuid()
-  if (!ownPuuid) return false
-
-  return hostPuuid === ownPuuid
 }
 
 function observeFriendImage(image: HTMLImageElement) {
@@ -109,7 +291,7 @@ function observeRegaliaPartyHost(host: Element) {
 
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
-      if (mutation.attributeName === MEMBER_TYPE_ATTR) {
+      if (mutation.attributeName === MEMBER_TYPE_ATTR || mutation.attributeName === PUUID_ATTR || mutation.attributeName === DATA_PUUID_ATTR) {
         scheduleApplyCustomAvatar()
         return
       }
@@ -118,7 +300,7 @@ function observeRegaliaPartyHost(host: Element) {
 
   observer.observe(host, {
     attributes: true,
-    attributeFilter: [MEMBER_TYPE_ATTR],
+    attributeFilter: [MEMBER_TYPE_ATTR, PUUID_ATTR, DATA_PUUID_ATTR],
   })
   regaliaPartyHostObservers.set(host, observer)
 }
@@ -128,7 +310,7 @@ function observeRegaliaHovercardHost(host: Element) {
 
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
-      if (mutation.attributeName === PUUID_ATTR) {
+      if (mutation.attributeName === PUUID_ATTR || mutation.attributeName === DATA_PUUID_ATTR) {
         scheduleApplyCustomAvatar()
         return
       }
@@ -137,12 +319,23 @@ function observeRegaliaHovercardHost(host: Element) {
 
   observer.observe(host, {
     attributes: true,
-    attributeFilter: [PUUID_ATTR],
+    attributeFilter: [PUUID_ATTR, DATA_PUUID_ATTR],
   })
   regaliaHovercardHostObservers.set(host, observer)
 }
 
-function patchFriendAvatar(image: HTMLImageElement, avatarUrl: string): boolean {
+function restoreFriendAvatar(image: HTMLImageElement): boolean {
+  if (!patchedFriendImages.has(image)) return false
+
+  const original = originalFriendImageSrc.get(image)
+  if (original == null) image.removeAttribute('src')
+  else image.setAttribute('src', original)
+  patchedFriendImages.delete(image)
+  patchedFriendImagePuuid.delete(image)
+  return true
+}
+
+function patchFriendAvatar(image: HTMLImageElement, avatarUrl: string, puuid: string): boolean {
   observeFriendImage(image)
 
   if (!originalFriendImageSrc.has(image)) {
@@ -153,10 +346,23 @@ function patchFriendAvatar(image: HTMLImageElement, avatarUrl: string): boolean 
 
   image.setAttribute('src', avatarUrl)
   patchedFriendImages.add(image)
+  patchedFriendImagePuuid.set(image, puuid)
   return true
 }
 
-function patchRegaliaAvatar(element: Element, avatarUrl: string): boolean {
+function restoreRegaliaAvatar(element: Element): boolean {
+  if (!patchedRegaliaElements.has(element)) return false
+
+  const original = originalRegaliaProfileIconUrl.get(element)
+  if (original == null) element.removeAttribute(PROFILE_ICON_ATTR)
+  else element.setAttribute(PROFILE_ICON_ATTR, original)
+  ;(element as unknown as { profileIconUrl?: string }).profileIconUrl = original ?? ''
+  patchedRegaliaElements.delete(element)
+  patchedRegaliaElementPuuid.delete(element)
+  return true
+}
+
+function patchRegaliaAvatar(element: Element, avatarUrl: string, puuid: string): boolean {
   observeRegaliaAvatarElement(element)
 
   if (!originalRegaliaProfileIconUrl.has(element)) {
@@ -168,6 +374,7 @@ function patchRegaliaAvatar(element: Element, avatarUrl: string): boolean {
   element.setAttribute(PROFILE_ICON_ATTR, avatarUrl)
   ;(element as unknown as { profileIconUrl?: string }).profileIconUrl = avatarUrl
   patchedRegaliaElements.add(element)
+  patchedRegaliaElementPuuid.set(element, puuid)
   return true
 }
 
@@ -193,64 +400,89 @@ function observeRegaliaShadowRoot(shadowRoot: ShadowRoot) {
   regaliaShadowRootObservers.set(shadowRoot, observer)
 }
 
-function queryRegaliaAvatarElements(): Element[] {
-  const elements = new Set<Element>()
+interface RegaliaAvatarCandidate {
+  element: Element
+  puuid: string
+}
+
+function queryRegaliaAvatarElements(): RegaliaAvatarCandidate[] {
+  const candidates = new Map<Element, RegaliaAvatarCandidate>()
+
+  const addCandidate = (element: Element, puuid: string) => {
+    const normalizedPuuid = normalizePuuid(puuid)
+    if (!normalizedPuuid) return
+    candidates.set(element, { element, puuid: normalizedPuuid })
+  }
 
   document.querySelectorAll(REGALIA_PROFILE_AVATAR_SELECTOR).forEach((element) => {
-    elements.add(element)
+    addCandidate(element, getRegaliaElementPuuid(element))
   })
 
   document.querySelectorAll<HTMLElement>(REGALIA_PARTY_ANY_HOST_SELECTOR).forEach((host) => {
     observeRegaliaPartyHost(host)
-    if (!host.matches(REGALIA_PARTY_HOST_SELECTOR)) return
+    const hostPuuid = getPuuidFromElement(host)
+    if (!hostPuuid) return
 
     const shadowRoot = host.shadowRoot
     if (!shadowRoot) return
 
     observeRegaliaShadowRoot(shadowRoot)
     shadowRoot.querySelectorAll(REGALIA_AVATAR_SELECTOR).forEach((element) => {
-      elements.add(element)
+      addCandidate(element, hostPuuid)
     })
   })
 
   document.querySelectorAll<HTMLElement>(REGALIA_HOVERCARD_HOST_SELECTOR).forEach((host) => {
     observeRegaliaHovercardHost(host)
-    if (!isOwnPuuidHost(host)) return
+    const hostPuuid = getPuuidFromElement(host)
+    if (!hostPuuid) return
 
     const shadowRoot = host.shadowRoot
     if (!shadowRoot) return
 
     observeRegaliaShadowRoot(shadowRoot)
     shadowRoot.querySelectorAll(REGALIA_AVATAR_SELECTOR).forEach((element) => {
-      elements.add(element)
+      addCandidate(element, hostPuuid)
     })
   })
 
   document.querySelectorAll<HTMLElement>(REGALIA_PROFILE_HOST_SELECTOR).forEach((host) => {
+    observeRegaliaHovercardHost(host)
+    const hostPuuid = getPuuidFromElement(host)
+    if (!hostPuuid) return
+
     const shadowRoot = host.shadowRoot
     if (!shadowRoot) return
 
     observeRegaliaShadowRoot(shadowRoot)
     shadowRoot.querySelectorAll(REGALIA_AVATAR_SELECTOR).forEach((element) => {
-      elements.add(element)
+      addCandidate(element, hostPuuid)
     })
   })
 
-  return [...elements]
+  return [...candidates.values()]
 }
 
 function applyCustomAvatar(): boolean {
-  const avatarUrl = getCurrentAvatarUrl()
-  if (!avatarUrl) return false
-
   let changed = false
 
   document.querySelectorAll<HTMLImageElement>(FRIEND_AVATAR_SELECTOR).forEach((image) => {
-    changed = patchFriendAvatar(image, avatarUrl) || changed
+    const puuid = getFriendImagePuuid(image) || (image.closest(SOCIAL_MEMBER_SELECTOR) ? '' : getOwnPuuid())
+    const avatarUrl = getAvatarUrlForPuuid(puuid)
+    if (avatarUrl) {
+      changed = patchFriendAvatar(image, avatarUrl, puuid) || changed
+    } else if (avatarUrl === null && patchedFriendImagePuuid.get(image) === puuid) {
+      changed = restoreFriendAvatar(image) || changed
+    }
   })
 
-  queryRegaliaAvatarElements().forEach((element) => {
-    changed = patchRegaliaAvatar(element, avatarUrl) || changed
+  queryRegaliaAvatarElements().forEach(({ element, puuid }) => {
+    const avatarUrl = getAvatarUrlForPuuid(puuid)
+    if (avatarUrl) {
+      changed = patchRegaliaAvatar(element, avatarUrl, puuid) || changed
+    } else if (avatarUrl === null && patchedRegaliaElementPuuid.get(element) === puuid) {
+      changed = restoreRegaliaAvatar(element) || changed
+    }
   })
 
   return changed || patchedFriendImages.size > 0 || patchedRegaliaElements.size > 0
@@ -284,18 +516,13 @@ function startCustomAvatarObserver() {
 }
 
 function restorePatchedAvatars() {
-  patchedFriendImages.forEach((image) => {
-    const original = originalFriendImageSrc.get(image)
-    if (original == null) image.removeAttribute('src')
-    else image.setAttribute('src', original)
+  Array.from(patchedFriendImages).forEach((image) => {
+    restoreFriendAvatar(image)
   })
   patchedFriendImages.clear()
 
-  patchedRegaliaElements.forEach((element) => {
-    const original = originalRegaliaProfileIconUrl.get(element)
-    if (original == null) element.removeAttribute(PROFILE_ICON_ATTR)
-    else element.setAttribute(PROFILE_ICON_ATTR, original)
-    ;(element as unknown as { profileIconUrl?: string }).profileIconUrl = original ?? ''
+  Array.from(patchedRegaliaElements).forEach((element) => {
+    restoreRegaliaAvatar(element)
   })
   patchedRegaliaElements.clear()
 }
@@ -307,6 +534,22 @@ function enableCustomAvatar() {
   }
 
   startCustomAvatarObserver()
+  if (!friendAvatarUnsub) {
+    friendAvatarUnsub = lcu.observe(FRIENDS_URI, (event) => {
+      const friend = getFriendFromWsData(event.data)
+      const puuid = normalizePuuid(friend?.puuid)
+      if (friend && puuid && !knownFriendPuuids.has(puuid)) {
+        indexFriendPuuid(friend)
+        knownFriendPuuids.add(puuid)
+        logger.info('[CustomAvatarSync] 好友 WS 捕获新增 PUUID，直接查询单个头像：%s', puuid)
+        void syncRemoteAvatarsForPuuids([puuid], 'friends-ws-direct')
+        return
+      }
+
+      scheduleFriendAvatarRefresh('friends-ws-update')
+    })
+  }
+  void refreshFriendAvatarCache(true, 'client-startup')
   applyCustomAvatar()
 }
 
@@ -330,6 +573,18 @@ function disableCustomAvatar() {
   regaliaHovercardHostObservers.clear()
   regaliaShadowRootObservers.forEach((observer) => observer.disconnect())
   regaliaShadowRootObservers.clear()
+  if (friendAvatarUnsub) {
+    friendAvatarUnsub()
+    friendAvatarUnsub = null
+  }
+  if (friendAvatarRefreshTimer != null) {
+    window.clearTimeout(friendAvatarRefreshTimer)
+    friendAvatarRefreshTimer = null
+  }
+  friendPuuidByName.clear()
+  knownFriendPuuids.clear()
+  friendPuuidMapPromise = null
+  friendPuuidMapUpdatedAt = 0
 
   if (customAvatarRaf) {
     cancelAnimationFrame(customAvatarRaf)
@@ -340,9 +595,31 @@ function disableCustomAvatar() {
 }
 
 export function updateBeautifyCustomAvatar() {
-  if (getCurrentAvatarUrl()) {
-    enableCustomAvatar()
-  } else {
-    disableCustomAvatar()
+  enableCustomAvatar()
+}
+
+export async function syncCustomAvatarAssetPath(assetPath: string) {
+  const ownPuuid = getOwnPuuid() || await lcu.getSummonerInfo()
+    .then((summoner) => {
+      ownPuuidCache = normalizePuuid(summoner.puuid)
+      return ownPuuidCache
+    })
+
+  if (!ownPuuid) {
+    throw new Error('无法获取当前玩家 PUUID。')
   }
+
+  const assetResponse = await fetch(getAssetUrl(assetPath))
+  if (!assetResponse.ok) {
+    throw new Error(`读取头像资源失败：${assetResponse.status} ${assetResponse.statusText}`)
+  }
+
+  const image = await assetResponse.blob()
+  const avatarUrl = await uploadSonaAvatar(ownPuuid, image)
+  remoteAvatarCache.set(ownPuuid, avatarUrl)
+  persistRemoteAvatarCacheEntry(ownPuuid, avatarUrl)
+  scheduleApplyCustomAvatar()
+  await lcu.sendNotification('Sona 头像同步成功', '你的自定义头像已经同步到云端，好友重启客户端后即可看到。').catch(() => {})
+
+  return avatarUrl
 }

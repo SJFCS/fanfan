@@ -5,6 +5,7 @@ import { SonaButton } from '@/components/ui/SonaButton'
 import { SonaInput } from '@/components/ui/SonaInput'
 import { SonaSlider } from '@/components/ui/SonaSlider'
 import { SonaSwitch } from '@/components/ui/SonaSwitch'
+import { syncCustomAvatarAssetPath } from '@/lib/features/beautify-client/custom-avatar'
 import { getPluginAssetsFolderPath, resolvePluginAssetUrl } from '@/lib/plugin-resolver'
 import { store } from '@/lib/store'
 import '@/styles/SettingsPage.css'
@@ -301,6 +302,15 @@ export function BeautifyPage() {
     }))
   }
 
+  const syncCustomAvatarAssetPathToCloud = async (assetPath: string) => {
+    try {
+      await syncCustomAvatarAssetPath(assetPath)
+      setAssetMessage(`已同步自定义头像：${assetPath}`)
+    } catch (err) {
+      setAssetMessage(`本地头像已应用，但同步失败：${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
   const addCustomAvatarAssetPath = (assetPath: string) => {
     if (!assetPaths.includes(assetPath)) {
       setAssetMessage('只能添加资源列表中已录入的图片。')
@@ -315,13 +325,23 @@ export function BeautifyPage() {
       return
     }
 
+    const shouldSync = customAvatarAssetPaths.length === 0
     saveCustomAvatarAssetPaths([...customAvatarAssetPaths, assetPath])
     setAssetMessage(`已添加到自定义头像：${assetPath}`)
+    if (shouldSync) {
+      void syncCustomAvatarAssetPathToCloud(assetPath)
+    }
   }
 
   const removeCustomAvatarAssetPath = (assetPath: string) => {
-    saveCustomAvatarAssetPaths(customAvatarAssetPaths.filter((path) => path !== assetPath))
+    const nextPaths = customAvatarAssetPaths.filter((path) => path !== assetPath)
+    const nextActivePath = nextPaths[0]
+    const shouldSyncNext = customAvatarAssetPaths[0] === assetPath && Boolean(nextActivePath)
+    saveCustomAvatarAssetPaths(nextPaths)
     setAssetMessage(`已从自定义头像移除：${assetPath}`)
+    if (shouldSyncNext && nextActivePath) {
+      void syncCustomAvatarAssetPathToCloud(nextActivePath)
+    }
   }
 
   const applyCustomAvatarAssetPath = (assetPath: string) => {
@@ -329,6 +349,7 @@ export function BeautifyPage() {
 
     if (customAvatarAssetPaths[0] === assetPath) {
       setAssetMessage(`当前已应用头像：${assetPath}`)
+      void syncCustomAvatarAssetPathToCloud(assetPath)
       return
     }
 
@@ -338,6 +359,7 @@ export function BeautifyPage() {
     ]
     saveCustomAvatarAssetPaths(nextPaths)
     setAssetMessage(`已应用自定义头像：${assetPath}`)
+    void syncCustomAvatarAssetPathToCloud(assetPath)
   }
 
   const stopDragAutoScroll = () => {

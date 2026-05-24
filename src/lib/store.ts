@@ -114,6 +114,8 @@ export interface SonaConfig {
   beautifyAssetPaths: string[]
   /** 自定义头像资源：从美化资源区复制引用的 assets 相对路径列表 */
   customAvatarAssetPaths: string[]
+  /** 好友可见自定义头像缓存：key 为 PUUID，value 为远端图片直链 */
+  customAvatarRemoteCache: Record<string, string>
   /** 好友智能分组（开黑好友用同样颜色的border-right展示） */
   friendSmartGroup: boolean
   /** 增强游戏中好友状态（显示模式、英雄和实时对局时长） */
@@ -219,6 +221,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   beautifyGlassOpacity: 28,
   beautifyAssetPaths: [],
   customAvatarAssetPaths: [],
+  customAvatarRemoteCache: {},
   friendSmartGroup: false,
   enhancedFriendGameStatus: true,
   lobbyEnhancement: true,
