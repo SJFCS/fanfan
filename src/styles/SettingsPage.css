@@ -383,6 +383,56 @@
   border-radius: 4px;
 }
 
+.sona-wallpaper-video-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(200, 170, 110, 0.08), transparent 42%),
+    rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(120, 90, 40, 0.36);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.sona-wallpaper-video-preview img {
+  position: absolute;
+  inset: 0;
+  display: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 0;
+  border-radius: 0;
+}
+
+.sona-wallpaper-video-preview img.sona-wallpaper-video-poster--loaded {
+  display: block;
+}
+
+.sona-wallpaper-video-preview span {
+  position: relative;
+  z-index: 1;
+  padding: 4px 8px;
+  border: 1px solid rgba(200, 170, 110, 0.26);
+  border-radius: 3px;
+  background: rgba(1, 10, 19, 0.68);
+  color: #c8aa6e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.sona-wallpaper-video-preview:not(.sona-wallpaper-video-preview--empty) span {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+}
+
 .sona-wallpaper-card-name,
 .sona-wallpaper-card-action {
   display: block;

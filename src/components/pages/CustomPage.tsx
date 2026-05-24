@@ -91,6 +91,10 @@ function getAssetUrl(assetPath: string): string {
   return resolvePluginAssetUrl(assetPath)
 }
 
+function getVideoPosterAssetPath(assetPath: string): string {
+  return assetPath.replace(/\.[^.\\/]+$/, '.png')
+}
+
 function getWallpaperBackgroundSize(adjustment: WallpaperAdjustment): string {
   return adjustment.scale === 1 ? 'cover' : `${Number((adjustment.scale * 100).toFixed(2))}% auto`
 }
@@ -367,6 +371,7 @@ export function CustomPage() {
     const nextPaths = homepageBackgroundAssetPaths.filter((path) => path !== assetPath)
     const nextAdjustments = { ...homepageBackgroundAdjustments }
     delete nextAdjustments[assetPath]
+    saveAssetPaths(assetPaths.filter((path) => path !== assetPath))
     saveHomepageBackgroundAssetPaths(nextPaths)
     saveHomepageBackgroundAdjustments(nextAdjustments)
     if (store.get('beautifyHomepageBackgroundLastRandomAssetPath') === assetPath) {
@@ -635,6 +640,7 @@ export function CustomPage() {
     const isActivePath = (customAvatarActiveAssetPath ?? customAvatarAssetPaths[0]) === assetPath
     const nextActivePath = isActivePath ? nextPaths[0] ?? null : customAvatarActiveAssetPath
     delete nextAdjustments[assetPath]
+    saveAssetPaths(assetPaths.filter((path) => path !== assetPath))
     saveCustomAvatarAssetPaths(nextPaths)
     saveCustomAvatarAdjustments(nextAdjustments)
     if (isActivePath) {
@@ -956,12 +962,21 @@ export function CustomPage() {
                           {t('beautify.wallpaper.adjust')}
                         </button>
                         {isVideoFile(assetPath) ? (
-                          <video
-                            src={getAssetUrl(assetPath)}
-                            muted
-                            preload="metadata"
-                            playsInline
-                          />
+                          <div className="sona-wallpaper-video-preview">
+                            <img
+                              src={getAssetUrl(getVideoPosterAssetPath(assetPath))}
+                              alt=""
+                              onError={(event) => {
+                                event.currentTarget.classList.remove('sona-wallpaper-video-poster--loaded')
+                                event.currentTarget.parentElement?.classList.add('sona-wallpaper-video-preview--empty')
+                              }}
+                              onLoad={(event) => {
+                                event.currentTarget.classList.add('sona-wallpaper-video-poster--loaded')
+                                event.currentTarget.parentElement?.classList.remove('sona-wallpaper-video-preview--empty')
+                              }}
+                            />
+                            <span>{t('beautify.media.video')}</span>
+                          </div>
                         ) : (
                           <img src={getAssetUrl(assetPath)} alt={assetPath} />
                         )}
@@ -1237,12 +1252,7 @@ export function CustomPage() {
                     ×
                   </button>
                   {isVideoFile(assetPath) ? (
-                    <video
-                      src={getAssetUrl(assetPath)}
-                      muted
-                      preload="metadata"
-                      playsInline
-                    />
+                    <img src={getAssetUrl(getVideoPosterAssetPath(assetPath))} alt={assetPath} />
                   ) : (
                     <img src={getAssetUrl(assetPath)} alt={assetPath} />
                   )}
