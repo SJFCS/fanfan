@@ -109,7 +109,7 @@ function ensureHomepageBackgroundVideo() {
     video.loop = true
     video.autoplay = true
     video.playsInline = true
-    video.preload = 'auto'
+    video.preload = 'metadata'
     viewportRoot.prepend(video)
   }
 
