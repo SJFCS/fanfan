@@ -15,6 +15,7 @@ export function NexusPage() {
   const [unlockAvailability, setUnlockAvailability] = useState(store.get('unlockAvailability'))
   const [friendSmartGroup, setFriendSmartGroup] = useState(store.get('friendSmartGroup'))
   const [enhancedFriendGameStatus, setEnhancedFriendGameStatus] = useState(store.get('enhancedFriendGameStatus'))
+  const [friendMatchHistory, setFriendMatchHistory] = useState(store.get('friendMatchHistory'))
   const [customProfileBg, setCustomProfileBg] = useState(store.get('customProfileBg'))
   const [customBanner, setCustomBanner] = useState(store.get('customBanner'))
   const [rankDisguise, setRankDisguise] = useState(store.get('rankDisguise'))
@@ -28,6 +29,7 @@ export function NexusPage() {
       store.onChange('unlockAvailability', setUnlockAvailability),
       store.onChange('friendSmartGroup', setFriendSmartGroup),
       store.onChange('enhancedFriendGameStatus', setEnhancedFriendGameStatus),
+      store.onChange('friendMatchHistory', setFriendMatchHistory),
       store.onChange('customProfileBg', setCustomProfileBg),
       store.onChange('customBanner', setCustomBanner),
       store.onChange('rankDisguise', setRankDisguise),
@@ -189,6 +191,15 @@ export function NexusPage() {
           <SonaSwitch
             checked={enhancedFriendGameStatus}
             onChange={(v) => { setEnhancedFriendGameStatus(v); store.set('enhancedFriendGameStatus', v) }}
+          />
+        </SettingCard>
+        <SettingCard
+          title="好友栏战绩快捷查询"
+          description="好友列表头像右上角显示快捷入口，点击即可打开该好友近期战绩。"
+        >
+          <SonaSwitch
+            checked={friendMatchHistory}
+            onChange={(v) => { setFriendMatchHistory(v); store.set('friendMatchHistory', v) }}
           />
         </SettingCard>
       </SettingGroup>

@@ -20,6 +20,7 @@ import { updateBenchNoCooldown } from '@/lib/features/bench-no-cooldown'
 import { updateGlobalParticle } from '@/lib/features/global-particle'
 import { updateFriendSmartGroup } from '@/lib/features/friend-smart-group'
 import { updateEnhancedFriendGameStatus } from '@/lib/features/enhanced-friend-game-status'
+import { updateFriendMatchHistory } from '@/lib/features/friend-match-history'
 import { updateLobbyMemberMatchHistory } from '@/lib/features/lobby-member-match-history'
 import { updateAutoHonor } from '@/lib/features/auto-honor'
 import { updateAutoLockChampion } from '@/lib/features/auto-lock-champion'
@@ -843,6 +844,9 @@ export function initFeatures() {
 
   updateEnhancedFriendGameStatus(store.get('enhancedFriendGameStatus'))
   store.onChange('enhancedFriendGameStatus', updateEnhancedFriendGameStatus)
+
+  updateFriendMatchHistory(store.get('friendMatchHistory'))
+  store.onChange('friendMatchHistory', updateFriendMatchHistory)
 
   updateLobbyMemberMatchHistory(store.get('lobbyEnhancement'))
   store.onChange('lobbyEnhancement', updateLobbyMemberMatchHistory)

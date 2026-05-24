@@ -138,6 +138,8 @@ export interface SonaConfig {
   friendSmartGroup: boolean
   /** 增强游戏中好友状态（显示模式、英雄和实时对局时长） */
   enhancedFriendGameStatus: boolean
+  /** 好友栏战绩查询入口（在好友头像上添加快捷查询按钮） */
+  friendMatchHistory: boolean
   /** 组队界面增强（点击成员头像查看战绩，并显示近期表现） */
   lobbyEnhancement: boolean
   /** 组队界面增强查询局数（20/50/100），默认50 */
@@ -249,6 +251,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   customAvatarRemoteCache: {},
   friendSmartGroup: false,
   enhancedFriendGameStatus: true,
+  friendMatchHistory: true,
   lobbyEnhancement: true,
   lobbyEnhancementFetchCount: 50,
   hideTFT: false,
