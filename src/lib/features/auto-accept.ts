@@ -1,13 +1,13 @@
 import { logger } from '@/index'
 import { store } from '@/lib/store'
 import { lcu, LcuEventUri } from '@/lib/lcu'
-import type { LCUEventMessage, GameflowPhase } from '@/lib/lcu'
+import type { LCUEventMessage, GameflowPhase, ReadyCheck } from '@/lib/lcu'
 
 // ==================== 自动接受对局 ====================
 
 const AUTO_ACCEPT_MAX_DELAY_MS = 15000
 
-let autoAcceptUnsub: (() => void) | null = null
+let autoAcceptUnsubs: Array<() => void> = []
 /** 记录当次 ReadyCheck 已调度的定时器，phase 离开 ReadyCheck 要清掉防止误触 */
 let autoAcceptTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -39,10 +39,7 @@ function computeAcceptDelayMs(): number {
 
 function scheduleAcceptMatch() {
   // 清理可能残留的上次调度（防御性）
-  if (autoAcceptTimer) {
-    clearTimeout(autoAcceptTimer)
-    autoAcceptTimer = null
-  }
+  cancelScheduledAccept()
 
   const delayMs = computeAcceptDelayMs()
 
@@ -61,27 +58,47 @@ function scheduleAcceptMatch() {
   }
 }
 
+function cancelScheduledAccept(reason?: string) {
+  if (!autoAcceptTimer) {
+    return
+  }
+
+  clearTimeout(autoAcceptTimer)
+  autoAcceptTimer = null
+  if (reason === 'accepted') {
+    logger.info('[AutoAccept] 已手动接受，取消即将执行的自动接受')
+  } else if (reason === 'declined') {
+    logger.info('[AutoAccept] 已手动拒绝，取消即将执行的自动接受')
+  } else if (reason) {
+    logger.info('[AutoAccept] 取消即将执行的自动接受: %s', reason)
+  }
+}
+
 export function updateAutoAccept(enabled: boolean) {
-  if (enabled && !autoAcceptUnsub) {
-    autoAcceptUnsub = lcu.observe(LcuEventUri.GAMEFLOW_PHASE_CHANGE, (event: LCUEventMessage) => {
-      const phase = event.data as GameflowPhase
-      if (phase === 'ReadyCheck') {
-        scheduleAcceptMatch()
-      } else if (autoAcceptTimer) {
-        // ReadyCheck 窗口关闭（玩家手动拒绝 / 自动超时 / 队友拒绝）时清掉定时器，
-        // 避免我们稍后的 accept 在"下一次 ReadyCheck 到来前"误触
-        clearTimeout(autoAcceptTimer)
-        autoAcceptTimer = null
-      }
-    })
+  if (enabled && autoAcceptUnsubs.length === 0) {
+    autoAcceptUnsubs = [
+      lcu.observe(LcuEventUri.GAMEFLOW_PHASE_CHANGE, (event: LCUEventMessage) => {
+        const phase = event.data as GameflowPhase
+        if (phase === 'ReadyCheck') {
+          scheduleAcceptMatch()
+        } else {
+          // ReadyCheck 窗口关闭（玩家手动拒绝 / 自动超时 / 队友拒绝）时清掉定时器，
+          // 避免我们稍后的 accept 在"下一次 ReadyCheck 到来前"误触
+          cancelScheduledAccept('not-in-ready-check')
+        }
+      }),
+      lcu.observe(LcuEventUri.READY_CHECK, (event: LCUEventMessage) => {
+        const readyCheck = event.data as ReadyCheck | null
+        if (readyCheck?.playerResponse === 'Accepted' || readyCheck?.playerResponse === 'Declined') {
+          cancelScheduledAccept(readyCheck.playerResponse.toLowerCase())
+        }
+      }),
+    ]
     logger.info('Auto accept enabled ✓')
-  } else if (!enabled && autoAcceptUnsub) {
-    autoAcceptUnsub()
-    autoAcceptUnsub = null
-    if (autoAcceptTimer) {
-      clearTimeout(autoAcceptTimer)
-      autoAcceptTimer = null
-    }
+  } else if (!enabled && autoAcceptUnsubs.length > 0) {
+    autoAcceptUnsubs.forEach((unsubscribe) => unsubscribe())
+    autoAcceptUnsubs = []
+    cancelScheduledAccept('disabled')
     logger.info('Auto accept disabled')
   }
 }
