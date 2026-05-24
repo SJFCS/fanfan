@@ -16,7 +16,8 @@ import { OptionsPage } from '@/components/pages/OptionsPage'
 import { AboutPage } from '@/components/pages/AboutPage'
 import { DebugPage } from '@/components/pages/DebugPage'
 import { UpdatePage } from '@/components/pages/UpdatePage'
-import { HomeIcon, GamepadIcon, PaletteIcon, SettingsIcon, InfoIcon, BugIcon, ZapIcon, EnhanceIcon, AutomationIcon, NexusIcon, UpdateIcon } from '@/components/ui/icons'
+import { AutoClaimPage } from '@/components/pages/AutoClaimPage'
+import { HomeIcon, GamepadIcon, PaletteIcon, SettingsIcon, InfoIcon, BugIcon, ZapIcon, EnhanceIcon, AutomationIcon, NexusIcon, UpdateIcon, RewardIcon } from '@/components/ui/icons'
 import { onModalVisibilityChange, isModalVisible, closeModal } from '@/lib/modal'
 import { store } from '@/lib/store'
 import { getUpdateState, onUpdateStateChange, type UpdateState } from '@/lib/update-checker'
@@ -27,6 +28,7 @@ const baseSidebarItemConfigs: Array<Omit<SidebarItem, 'label'> & { labelKey: Tra
   { id: 'home', icon: <HomeIcon />, labelKey: 'nav.home' },
   { id: 'enhance', icon: <EnhanceIcon />, labelKey: 'nav.enhance' },
   { id: 'automation', icon: <AutomationIcon />, labelKey: 'nav.automation' },
+  { id: 'auto-claim', icon: <RewardIcon />, labelKey: 'nav.autoClaim' },
   { id: 'nexus', icon: <NexusIcon />, labelKey: 'nav.nexus' },  
   { id: 'custom', icon: <PaletteIcon />, labelKey: 'nav.custom' },
   { id: 'toolkit', icon: <GamepadIcon />, labelKey: 'nav.toolkit' },
@@ -55,6 +57,8 @@ function PageContent({ pageId }: { pageId: string }) {
       return <EnhancePage />
     case 'automation':
       return <AutomationPage />
+    case 'auto-claim':
+      return <AutoClaimPage />
     case 'nexus':
       return <NexusPage />
     case 'custom':

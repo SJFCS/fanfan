@@ -164,6 +164,48 @@ export interface RegaliaBannerInventoryEntry {
 
 export type RegaliaBannerInventory = RegaliaBannerInventoryEntry[]
 
+export interface RewardGrant {
+  info: {
+    id: string
+    status: string
+  }
+  rewardGroup: {
+    id: string
+    localizations?: {
+      title?: string
+    }
+    rewards: Array<{
+      id: string
+      itemId?: string
+      localizations?: {
+        title?: string
+      }
+      media?: {
+        iconUrl?: string
+      }
+    }>
+    selectionStrategyConfig?: {
+      maxSelectionsAllowed?: number
+    }
+  }
+}
+
+export interface MissionReward {
+  rewardGroup: string
+  description?: string
+  iconUrl?: string
+}
+
+export interface Mission {
+  id: string
+  internalName: string
+  status: string
+  rewards: MissionReward[]
+  rewardStrategy?: {
+    selectMaxGroupCount?: number
+  }
+}
+
 function isRegaliaBannerInventoryEntry(value: unknown): value is RegaliaBannerInventoryEntry {
   return Boolean(value && typeof value === 'object' && Array.isArray((value as { items?: unknown }).items))
 }
@@ -1137,6 +1179,27 @@ class LCUManager {
   async getRegaliaBannerInventory(): Promise<RegaliaBannerInventory> {
     const raw = await get<unknown>('/lol-regalia/v3/inventory/REGALIA_BANNER')
     return normalizeRegaliaBannerInventory(raw)
+  }
+
+  getRewardGrants(status?: string): Promise<RewardGrant[]> {
+    const params = status ? `?status=${encodeURIComponent(status)}` : ''
+    return get<RewardGrant[]>(`/lol-rewards/v1/grants${params}`)
+  }
+
+  selectRewardGrant(grantId: string, data: {
+    grantId: string
+    rewardGroupId: string
+    selections: string[]
+  }): Promise<void> {
+    return post<void>(`/lol-rewards/v1/grants/${encodeURIComponent(grantId)}/select`, data)
+  }
+
+  getMissions(): Promise<Mission[]> {
+    return get<Mission[]>('/lol-missions/v1/missions')
+  }
+
+  selectMissionRewardGroups(missionId: string, rewardGroups: string[]): Promise<void> {
+    return put<void>(`/lol-missions/v1/player/${encodeURIComponent(missionId)}`, { rewardGroups })
   }
 
   /** 获取当前召唤师的 Regalia 装饰配置 */

@@ -1083,6 +1083,10 @@ export enum LcuEventUri {
   LOBBY = '/lol-lobby/v2/lobby',
   /** 当前玩家的聊天状态（availability / statusMessage 等） */
   CHAT_ME = '/lol-chat/v1/me',
+  /** 待领取奖励 */
+  REWARDS_GRANTS = '/lol-rewards/v1/grants',
+  /** 任务列表 */
+  MISSIONS = '/lol-missions/v1/missions',
 }
 
 // ==================== 聊天相关 ====================
