@@ -193,7 +193,6 @@ export function ToolsPage() {
   const [champSelectQuitButton, setChampSelectQuitButton] = useState(store.get('champSelectQuitButton'))
   const [gameAnalysisPopup, setGameAnalysisPopup] = useState(store.get('gameAnalysisPopup'))
   const [autoReturnToLobby, setAutoReturnToLobby] = useState(store.get('autoReturnToLobby'))
-  const [autoReturnMode, setAutoReturnMode] = useState(store.get('autoReturnMode'))
   const [analyzeTeamPower, setAnalyzeTeamPower] = useState(store.get('analyzeTeamPower'))
   const [analyzeTeamPowerMsgType, setAnalyzeTeamPowerMsgType] = useState(store.get('analyzeTeamPowerMsgType'))
   const [analyzeTeamPowerFetchCount, setAnalyzeTeamPowerFetchCount] = useState(store.get('analyzeTeamPowerFetchCount'))
@@ -277,7 +276,6 @@ export function ToolsPage() {
       store.onChange('champSelectQuitButton', setChampSelectQuitButton),
       store.onChange('gameAnalysisPopup', setGameAnalysisPopup),
       store.onChange('autoReturnToLobby', setAutoReturnToLobby),
-      store.onChange('autoReturnMode', setAutoReturnMode),
       store.onChange('analyzeTeamPower', setAnalyzeTeamPower),
       store.onChange('analyzeTeamPowerFetchCount', setAnalyzeTeamPowerFetchCount),
       store.onChange('champSelectAssistFetchCount', setChampSelectAssistFetchCount),
@@ -421,6 +419,27 @@ export function ToolsPage() {
     setAutoBanChampionIds(next)
     store.set('autoBanChampionIds', next)
   }
+
+  const handleAutoHonorChange = (enabled: boolean) => {
+    setAutoHonor(enabled)
+    store.set('autoHonor', enabled)
+
+    if (!enabled && autoReturnToLobby) {
+      setAutoReturnToLobby(false)
+      store.set('autoReturnToLobby', false)
+    }
+  }
+
+  const handleAutoReturnChange = (enabled: boolean) => {
+    if (!autoHonor && enabled) {
+      return
+    }
+
+    setAutoReturnToLobby(enabled)
+    store.set('autoReturnToLobby', enabled)
+  }
+
+  const autoReturnDisabled = !autoHonor
 
   return (
     <div className="sona-settings">
@@ -618,19 +637,12 @@ export function ToolsPage() {
         </SettingCard>
         <SettingCard
           title={t('tools.autoReturn.title')}
-          description={t('tools.autoReturn.description')}
+          description={autoReturnDisabled ? t('tools.autoReturn.requiresHonor') : t('tools.autoReturn.description')}
         >
-          <SonaSelect
-            value={autoReturnMode}
-            onChange={(v) => { setAutoReturnMode(v); store.set('autoReturnMode', v) }}
-            options={[
-              { value: 'queue', label: t('option.autoReturn.queue') },
-              { value: 'lobby', label: t('option.autoReturn.lobby') },
-            ]}
-          />
           <SonaSwitch
-            checked={autoReturnToLobby}
-            onChange={(v) => { setAutoReturnToLobby(v); store.set('autoReturnToLobby', v) }}
+            checked={autoReturnToLobby && autoHonor}
+            onChange={handleAutoReturnChange}
+            disabled={autoReturnDisabled}
           />
         </SettingCard>
         <SettingCard
@@ -639,7 +651,7 @@ export function ToolsPage() {
         >
           <SonaSwitch
             checked={autoHonor}
-            onChange={(v) => { setAutoHonor(v); store.set('autoHonor', v) }}
+            onChange={handleAutoHonorChange}
           />
         </SettingCard>
         <SettingCard

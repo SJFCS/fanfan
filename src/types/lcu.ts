@@ -1079,6 +1079,7 @@ export enum LcuEventUri {
   TFT_BATTLE_PASS = '/lol-tft-pass/v1/battle-pass',
   /** 游戏流程阶段变化（仅 phase 字符串） */
   GAMEFLOW_PHASE_CHANGE = '/lol-gameflow/v1/gameflow-phase',
+  HONOR_BALLOT = '/lol-honor-v2/v1/ballot',
   /** 大厅/房间状态 */
   LOBBY = '/lol-lobby/v2/lobby',
   /** 当前玩家的聊天状态（availability / statusMessage 等） */

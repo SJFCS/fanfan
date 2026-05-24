@@ -207,8 +207,16 @@ export interface SonaConfig {
   gameAnalysisPopup: boolean
   /** 对局结束后自动返回房间 */
   autoReturnToLobby: boolean
-  /** 自动返回模式: queue=自动排队, lobby=仅返回房间 */
-  autoReturnMode: string
+  /** 对局结束后返回房间的后续行为：queue=自动匹配，lobby=仅返回房间 */
+  autoReturnMode: 'queue' | 'lobby'
+  /** 自动匹配 */
+  autoMatchmaking: boolean
+  /** 自动匹配最低房间人数 */
+  autoMatchmakingMinimumMembers: number
+  /** 自动匹配前等待时长（秒） */
+  autoMatchmakingDelaySeconds: number
+  /** 自动匹配前等待邀请中的成员 */
+  autoMatchmakingWaitForInvitees: boolean
 }
 
 
@@ -294,6 +302,10 @@ const DEFAULT_CONFIG: SonaConfig = {
   gameAnalysisPopup: false,
   autoReturnToLobby: false,
   autoReturnMode: 'queue',
+  autoMatchmaking: false,
+  autoMatchmakingMinimumMembers: 1,
+  autoMatchmakingDelaySeconds: 5,
+  autoMatchmakingWaitForInvitees: true,
 }
 
 
@@ -305,6 +317,7 @@ const KEY_PREFIX = 'sona:'
 
 type ConfigKey = keyof SonaConfig
 type ChangeListener<K extends ConfigKey = ConfigKey> = (value: SonaConfig[K], key: K) => void
+type LegacyAutoReturnMode = 'queue' | 'lobby'
 
 class SonaStore {
   private listeners = new Map<ConfigKey, Set<ChangeListener>>()
@@ -318,6 +331,7 @@ class SonaStore {
     }
     this.migrateLegacyAutoReturnMode(loaded)
     this.migrateLegacyInGameAutoPopupMode(loaded)
+    this.migrateLegacyAutoReturnMode(loaded)
     this.cache = loaded
   }
 

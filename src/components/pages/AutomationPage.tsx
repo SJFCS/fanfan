@@ -3,10 +3,10 @@ import { SettingCard, SettingGroup } from '@/components/ui/SettingCard'
 import { SonaButton } from '@/components/ui/SonaButton'
 import { SonaInput } from '@/components/ui/SonaInput'
 import { SonaSwitch } from '@/components/ui/SonaSwitch'
-import { SonaSelect } from '@/components/ui/SonaSelect'
 import { searchChampions, getChampionById, type ChampionInfo } from '@/lib/assets'
 import { logger } from '@/index'
 import { store } from '@/lib/store'
+import { AUTO_MATCHMAKING_MIN_MEMBERS_MAX, AUTO_MATCHMAKING_MIN_MEMBERS_MIN } from '@/lib/auto-matchmaking-config'
 import { useI18n } from '@/i18n'
 import '@/styles/SettingsPage.css'
 
@@ -100,7 +100,10 @@ export function AutomationPage() {
   const [autoAcceptDelayMin, setAutoAcceptDelayMin] = useState(String(store.get('autoAcceptDelayMin')))
   const [autoAcceptDelayMax, setAutoAcceptDelayMax] = useState(String(store.get('autoAcceptDelayMax')))
   const [autoReturnToLobby, setAutoReturnToLobby] = useState(store.get('autoReturnToLobby'))
-  const [autoReturnMode, setAutoReturnMode] = useState(store.get('autoReturnMode'))
+  const [autoMatchmaking, setAutoMatchmaking] = useState(store.get('autoMatchmaking'))
+  const [autoMatchmakingMinimumMembers, setAutoMatchmakingMinimumMembers] = useState(String(store.get('autoMatchmakingMinimumMembers')))
+  const [autoMatchmakingDelaySeconds, setAutoMatchmakingDelaySeconds] = useState(String(store.get('autoMatchmakingDelaySeconds')))
+  const [autoMatchmakingWaitForInvitees, setAutoMatchmakingWaitForInvitees] = useState(store.get('autoMatchmakingWaitForInvitees'))
   const [autoHonor, setAutoHonor] = useState(store.get('autoHonor'))
   const [autoLockChampion, setAutoLockChampion] = useState(store.get('autoLockChampion'))
   const [autoLockChampionIds, setAutoLockChampionIds] = useState(store.get('autoLockChampionIds'))
@@ -130,7 +133,10 @@ export function AutomationPage() {
       store.onChange('autoAcceptDelayMin', (v) => setAutoAcceptDelayMin(String(v))),
       store.onChange('autoAcceptDelayMax', (v) => setAutoAcceptDelayMax(String(v))),
       store.onChange('autoReturnToLobby', setAutoReturnToLobby),
-      store.onChange('autoReturnMode', setAutoReturnMode),
+      store.onChange('autoMatchmaking', setAutoMatchmaking),
+      store.onChange('autoMatchmakingMinimumMembers', (v) => setAutoMatchmakingMinimumMembers(String(v))),
+      store.onChange('autoMatchmakingDelaySeconds', (v) => setAutoMatchmakingDelaySeconds(String(v))),
+      store.onChange('autoMatchmakingWaitForInvitees', setAutoMatchmakingWaitForInvitees),
       store.onChange('autoHonor', setAutoHonor),
       store.onChange('autoLockChampion', setAutoLockChampion),
       store.onChange('autoLockChampionIds', setAutoLockChampionIds),
@@ -228,6 +234,54 @@ export function AutomationPage() {
     store.set('autoBanChampionIds', next)
   }
 
+  const handleAutoHonorChange = (enabled: boolean) => {
+    setAutoHonor(enabled)
+    store.set('autoHonor', enabled)
+
+    if (!enabled && autoReturnToLobby) {
+      setAutoReturnToLobby(false)
+      store.set('autoReturnToLobby', false)
+    }
+  }
+
+  const handleAutoReturnChange = (enabled: boolean) => {
+    if (!autoHonor && enabled) {
+      return
+    }
+
+    setAutoReturnToLobby(enabled)
+    store.set('autoReturnToLobby', enabled)
+  }
+
+  const autoReturnDisabled = !autoHonor
+
+  const handleAutoMatchmakingChange = (enabled: boolean) => {
+    setAutoMatchmaking(enabled)
+    store.set('autoMatchmaking', enabled)
+  }
+
+  const handleMinimumMembersChange = (value: string) => {
+    const cleaned = value.replace(/[^\d]/g, '')
+    setAutoMatchmakingMinimumMembers(cleaned)
+    const parsed = parseInt(cleaned, 10)
+    const next = Number.isFinite(parsed)
+      ? Math.max(AUTO_MATCHMAKING_MIN_MEMBERS_MIN, Math.min(AUTO_MATCHMAKING_MIN_MEMBERS_MAX, parsed))
+      : AUTO_MATCHMAKING_MIN_MEMBERS_MIN
+    store.set('autoMatchmakingMinimumMembers', next)
+  }
+
+  const handleMatchmakingDelayChange = (value: string) => {
+    const cleaned = value.replace(/[^\d]/g, '')
+    setAutoMatchmakingDelaySeconds(cleaned)
+    const parsed = parseInt(cleaned, 10)
+    store.set('autoMatchmakingDelaySeconds', Number.isFinite(parsed) ? parsed : 0)
+  }
+
+  const normalizeAutoMatchmakingInputs = () => {
+    setAutoMatchmakingMinimumMembers(String(store.get('autoMatchmakingMinimumMembers')))
+    setAutoMatchmakingDelaySeconds(String(store.get('autoMatchmakingDelaySeconds')))
+  }
+
   return (
     <div className="sona-settings">
       <SettingGroup title={t('tools.group.automation')}>      
@@ -281,31 +335,83 @@ export function AutomationPage() {
           </div>
         )}
         <SettingCard
-          title={t('tools.autoReturn.title')}
-          description={t('tools.autoReturn.description')}
-        >
-          <SonaSelect
-            value={autoReturnMode}
-            onChange={(v) => { setAutoReturnMode(v); store.set('autoReturnMode', v) }}
-            options={[
-              { value: 'queue', label: t('option.autoReturn.queue') },
-              { value: 'lobby', label: t('option.autoReturn.lobby') },
-            ]}
-          />
-          <SonaSwitch
-            checked={autoReturnToLobby}
-            onChange={(v) => { setAutoReturnToLobby(v); store.set('autoReturnToLobby', v) }}
-          />
-        </SettingCard>
-        <SettingCard
           title={t('tools.autoHonor.title')}
           description={t('tools.autoHonor.description')}
         >
           <SonaSwitch
             checked={autoHonor}
-            onChange={(v) => { setAutoHonor(v); store.set('autoHonor', v) }}
+            onChange={handleAutoHonorChange}
           />
         </SettingCard>
+        <SettingCard
+          title={t('tools.autoReturn.title')}
+          description={autoReturnDisabled ? t('tools.autoReturn.requiresHonor') : t('tools.autoReturn.description')}
+        >
+          <SonaSwitch
+            checked={autoReturnToLobby && autoHonor}
+            onChange={handleAutoReturnChange}
+            disabled={autoReturnDisabled}
+          />
+        </SettingCard>
+        <SettingCard
+          title={t('tools.autoMatchmaking.title')}
+          description={t('tools.autoMatchmaking.description')}
+        >
+          <SonaSwitch
+            checked={autoMatchmaking}
+            onChange={handleAutoMatchmakingChange}
+          />
+        </SettingCard>
+        {autoMatchmaking && (
+          <div className="sona-setting-switch-panel">
+            <div className="sona-setting-panel-section">
+              <SettingCard
+                title={t('tools.autoMatchmaking.minimumMembers.title')}
+                description={t('tools.autoMatchmaking.minimumMembers.description', {
+                  min: AUTO_MATCHMAKING_MIN_MEMBERS_MIN,
+                  max: AUTO_MATCHMAKING_MIN_MEMBERS_MAX,
+                })}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 80 }}>
+                    <SonaInput
+                      value={autoMatchmakingMinimumMembers}
+                      onChange={handleMinimumMembersChange}
+                      onBlur={normalizeAutoMatchmakingInputs}
+                      placeholder="1"
+                    />
+                  </div>
+                  <span style={{ color: '#a09b8c', fontSize: 13 }}>{t('tools.autoMatchmaking.minimumMembers.unit')}</span>
+                </div>
+              </SettingCard>
+              <SettingCard
+                title={t('tools.autoMatchmaking.delay.title')}
+                description={t('tools.autoMatchmaking.delay.description')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 80 }}>
+                    <SonaInput
+                      value={autoMatchmakingDelaySeconds}
+                      onChange={handleMatchmakingDelayChange}
+                      onBlur={normalizeAutoMatchmakingInputs}
+                      placeholder="5"
+                    />
+                  </div>
+                  <span style={{ color: '#a09b8c', fontSize: 13 }}>{t('tools.autoMatchmaking.delay.unit')}</span>
+                </div>
+              </SettingCard>
+              <SettingCard
+                title={t('tools.autoMatchmaking.waitForInvitees.title')}
+                description={t('tools.autoMatchmaking.waitForInvitees.description')}
+              >
+                <SonaSwitch
+                  checked={autoMatchmakingWaitForInvitees}
+                  onChange={(v) => { setAutoMatchmakingWaitForInvitees(v); store.set('autoMatchmakingWaitForInvitees', v) }}
+                />
+              </SettingCard>
+            </div>
+          </div>
+        )}
         <SettingCard
           title={t('tools.autoLock.title')}
           description={t('tools.autoLock.description')}

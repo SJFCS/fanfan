@@ -31,6 +31,7 @@ import { updateCustomProfileBg } from '@/lib/features/profile-background'
 import { updateCustomBanner } from '@/lib/features/custom-banner'
 import { updateGameAnalysisPopup } from '@/lib/features/game-analysis-popup'
 import { updateAutoReturnToLobby } from '@/lib/features/auto-return-to-lobby'
+import { refreshAutoMatchmakingConfig, updateAutoMatchmaking } from '@/lib/features/auto-matchmaking'
 import { updateOpggBuildRecommendation } from '@/lib/features/opgg-build-recommendation'
 import { updateBeautifyCustomAvatar } from '@/lib/features/beautify-client/custom-avatar'
 import { initSocialSidebarGlass, updateSocialSidebarGlassConfig } from '@/lib/features/beautify-client/social-sidebar-glass'
@@ -886,8 +887,23 @@ export function initFeatures() {
   updateBeautifyWallpaperMode(store.get('beautifyWallpaperMode'))
   store.onChange('beautifyWallpaperMode', updateBeautifyWallpaperMode)
 
+  const syncAutoReturnToLobby = () => {
+    const enabled = store.get('autoHonor') && store.get('autoReturnToLobby')
+    updateAutoReturnToLobby(enabled)
+  }
+
+  const syncAutoMatchmaking = () => {
+    updateAutoMatchmaking(store.get('autoMatchmaking'))
+  }
+
   updateAutoHonor(store.get('autoHonor'))
-  store.onChange('autoHonor', updateAutoHonor)
+  store.onChange('autoHonor', (enabled) => {
+    updateAutoHonor(enabled)
+    if (!enabled && store.get('autoReturnToLobby')) {
+      store.set('autoReturnToLobby', false)
+    }
+    syncAutoReturnToLobby()
+  })
 
   // 段位伪装：启动时自动应用，配置变化时重新应用
   updateRankDisguise(store.get('rankDisguise'))
@@ -918,15 +934,17 @@ export function initFeatures() {
   syncGameAnalysisPopup()
   store.onChange('inGameAutoPopupMode', syncGameAnalysisPopup)
 
-  updateAutoReturnToLobby(store.get('autoReturnToLobby'))
-  store.onChange('autoReturnToLobby', updateAutoReturnToLobby)
-  store.onChange('autoReturnMode', () => {
-    // 模式变化时，如果功能已启用，重新注册以应用新模式
-    if (store.get('autoReturnToLobby')) {
-      updateAutoReturnToLobby(false)
-      updateAutoReturnToLobby(true)
-    }
+  syncAutoReturnToLobby()
+  store.onChange('autoReturnToLobby', () => {
+    syncAutoReturnToLobby()
   })
+  syncAutoMatchmaking()
+  store.onChange('autoMatchmaking', () => {
+    syncAutoMatchmaking()
+  })
+  store.onChange('autoMatchmakingMinimumMembers', refreshAutoMatchmakingConfig)
+  store.onChange('autoMatchmakingDelaySeconds', refreshAutoMatchmakingConfig)
+  store.onChange('autoMatchmakingWaitForInvitees', refreshAutoMatchmakingConfig)
 
   // 解锁在线状态切换（接管客户端按钮，弹自定义"隐身/手机在线"菜单）
   setAvailabilityHijackEnabled(store.get('unlockAvailability'))

@@ -747,6 +747,11 @@ class LCUManager {
     return result.searchState
   }
 
+  /** 获取当前匹配搜索详情 */
+  getMatchSearchResult(): Promise<MatchSearchResult> {
+    return get<MatchSearchResult>('/lol-lobby/v2/lobby/matchmaking/search-state')
+  }
+
   /** 接受对局 (Ready Check) */
   acceptMatch(): Promise<unknown> {
     return post('/lol-matchmaking/v1/ready-check/accept')
