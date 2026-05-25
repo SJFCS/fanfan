@@ -70,10 +70,40 @@
 
 .sona-availability-dot--chat     { background: #43b581; box-shadow: 0 0 4px rgba(67, 181, 129, 0.6); }
 .sona-availability-dot--away     { background: #f04747; box-shadow: 0 0 4px rgba(240, 71, 71, 0.6);}
-.sona-availability-dot--dnd      { background: #faa61a; box-shadow: 0 0 4px rgba(250, 166, 26, 0.6);}
+.sona-availability-dot--dnd      { background: #1e90ff; box-shadow: 0 0 4px rgba(30, 144, 255, 0.6);}
 .sona-availability-dot--offline  { background: #747f8d; box-shadow: none; }
 .sona-availability-dot--mobile   { background: #43b581; box-shadow: 0 0 4px rgba(67, 181, 129, 0.6); }
 
-.social-identity-block .lol-social-availability-hitbox[data-sona-hijacked="true"] {
-  transform: translateX(4px);
+/* 修复状态圆点位置 */
+.social-identity-block .lol-social-availability-hitbox[data-sona-hijacked="true"] .availability-icon {
+  position: relative !important;
+  width: 11px !important;
+  height: 11px !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.social-identity-block .lol-social-availability-hitbox[data-sona-hijacked="true"] .availability-icon::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  background: #43b581;
+  box-shadow: 0 0 4px rgba(67, 181, 129, 0.65);
+}
+
+.social-identity-block .lol-social-availability-hitbox[data-sona-hijacked="true"] .availability-icon.away::before {
+  background: #f04747;
+  box-shadow: 0 0 4px rgba(240, 71, 71, 0.65);
+}
+
+.social-identity-block .lol-social-availability-hitbox[data-sona-hijacked="true"] .availability-icon.dnd::before {
+  background: #1e90ff;
+  box-shadow: 0 0 4px rgba(30, 144, 255, 0.65);
+}
+
+.social-identity-block .lol-social-availability-hitbox[data-sona-hijacked="true"] .availability-icon.offline::before {
+  background: #747f8d;
+  box-shadow: none;
 }

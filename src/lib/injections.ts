@@ -343,6 +343,22 @@ function closeAvailabilityMenu() {
   document.getElementById(MENU_ID)?.remove()
 }
 
+function patchNotificationPip(pip: HTMLElement) {
+  pip.style.setProperty('transform', 'translate(-3px, 1px)', 'important')
+  pip.style.setProperty('box-shadow', '0 0 0 2px #4e4e4e', 'important')
+}
+
+function queryNotificationPip(): HTMLElement | null {
+  const host = document.querySelector<HTMLElement>('lol-player-notifications-button.notifications-button')
+  return host?.shadowRoot?.querySelector<HTMLElement>('.player-notifications-button-unread-pip') ?? null
+}
+
+function tryPatchNotificationPip(): boolean {
+  const pip = queryNotificationPip()
+  if (pip) patchNotificationPip(pip)
+  return true
+}
+
 /** 创建并显示状态选择菜单 */
 function showAvailabilityMenu(anchor: HTMLElement) {
   closeAvailabilityMenu()
@@ -577,6 +593,7 @@ function tryHideRightNavText(): boolean {
  */
 export function registerAllInjections() {
   injector.register(tryInjectSonaButton)
+  injector.register(tryPatchNotificationPip)
   // tryHijackAvailabilityHitbox 由 features.ts 的 unlockAvailability 开关按需注册
 
   // 状态同步启动顺序（重要！）：
