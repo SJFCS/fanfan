@@ -4,13 +4,19 @@ import { logger } from '.'
 import { Modal } from '@/components/ui/Modal'
 import { Sidebar, type SidebarItem } from '@/components/ui/Sidebar'
 import { HomePage } from '@/components/pages/HomePage'
-import { ToolsPage } from '@/components/pages/ToolsPage'
-import { BeautifyPage } from '@/components/pages/BeautifyPage'
-import { SettingsPage } from '@/components/pages/SettingsPage'
+// import { ToolsPage } from '@/components/pages/ToolsPage'
+// import { BeautifyPage } from '@/components/pages/BeautifyPage'
+// import { SettingsPage } from '@/components/pages/SettingsPage'
+import { EnhancePage } from '@/components/pages/EnhancePage'
+import { AutomationPage } from '@/components/pages/AutomationPage'
+import { NexusPage } from '@/components/pages/NexusPage'
+import { CustomPage } from '@/components/pages/CustomPage'
+import { ToolkitPage } from '@/components/pages/ToolkitPage'
+import { OptionsPage } from '@/components/pages/OptionsPage'
 import { AboutPage } from '@/components/pages/AboutPage'
 import { DebugPage } from '@/components/pages/DebugPage'
 import { UpdatePage } from '@/components/pages/UpdatePage'
-import { HomeIcon, GamepadIcon, PaletteIcon, SettingsIcon, InfoIcon, BugIcon, ZapIcon } from '@/components/ui/icons'
+import { HomeIcon, GamepadIcon, PaletteIcon, SettingsIcon, InfoIcon, BugIcon, ZapIcon, EnhanceIcon, AutomationIcon, NexusIcon, UpdateIcon } from '@/components/ui/icons'
 import { onModalVisibilityChange, isModalVisible, closeModal } from '@/lib/modal'
 import { store } from '@/lib/store'
 import { getUpdateState, onUpdateStateChange, type UpdateState } from '@/lib/update-checker'
@@ -19,9 +25,15 @@ import type { TranslationKey } from '@/i18n'
 
 const baseSidebarItemConfigs: Array<Omit<SidebarItem, 'label'> & { labelKey: TranslationKey }> = [
   { id: 'home', icon: <HomeIcon />, labelKey: 'nav.home' },
-  { id: 'tools', icon: <GamepadIcon />, labelKey: 'nav.tools' },
-  { id: 'beautify', icon: <PaletteIcon />, labelKey: 'nav.beautify' },
-  { id: 'settings', icon: <SettingsIcon />, labelKey: 'nav.settings' },
+  { id: 'enhance', icon: <EnhanceIcon />, labelKey: 'nav.enhance' },
+  { id: 'automation', icon: <AutomationIcon />, labelKey: 'nav.automation' },
+  { id: 'nexus', icon: <NexusIcon />, labelKey: 'nav.nexus' },  
+  { id: 'custom', icon: <PaletteIcon />, labelKey: 'nav.custom' },
+  { id: 'toolkit', icon: <GamepadIcon />, labelKey: 'nav.toolkit' },
+  { id: 'options', icon: <SettingsIcon />, labelKey: 'nav.options' },
+  // { id: 'tools', icon: <GamepadIcon />, labelKey: 'nav.tools' },
+  // { id: 'beautify', icon: <PaletteIcon />, labelKey: 'nav.beautify' },
+  // { id: 'settings', icon: <SettingsIcon />, labelKey: 'nav.settings' },
   { id: 'about', icon: <InfoIcon />, labelKey: 'nav.about' },
 ]
 
@@ -30,7 +42,7 @@ const debugSidebarItemConfig: Omit<SidebarItem, 'label'> & { labelKey: Translati
 }
 
 const updateSidebarItemConfig: Omit<SidebarItem, 'label'> & { labelKey: TranslationKey } = {
-  id: 'update', icon: <ZapIcon />, labelKey: 'nav.updateAvailable',
+  id: 'update', icon: <UpdateIcon />, labelKey: 'nav.updateAvailable',
 }
 
 function PageContent({ pageId }: { pageId: string }) {
@@ -38,13 +50,25 @@ function PageContent({ pageId }: { pageId: string }) {
     case 'update':
       return <UpdatePage />
     case 'home':
-      return <HomePage />
+      return <HomePage /> 
+    case 'enhance':
+      return <EnhancePage />
+    case 'automation':
+      return <AutomationPage />
+    case 'nexus':
+      return <NexusPage />
+    case 'custom':
+      return <CustomPage />
+    case 'toolkit':
+      return <ToolkitPage />         
+    case 'options':
+      return <OptionsPage />
     case 'tools':
-      return <ToolsPage />
-    case 'beautify':
-      return <BeautifyPage />
-    case 'settings':
-      return <SettingsPage />
+    //   return <ToolsPage />
+    // case 'beautify':
+    //   return <BeautifyPage />
+    // case 'settings':
+    //   return <SettingsPage />
     case 'about':
       return <AboutPage />
     case 'debug':
