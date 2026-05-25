@@ -129,9 +129,15 @@ export async function uploadAvatarToImgbb(image: Blob): Promise<string> {
   return avatarUrl
 }
 
-export async function writeAvatarUrlToStatusMessage(avatarUrl: string): Promise<void> {
+export async function writeAvatarUrlToStatusMessage(avatarUrl: string, fallbackStatusMessage = ''): Promise<void> {
   const chatMe = await lcu.getChatMe()
-  const nextStatusMessage = embedAvatarStatusPayload(chatMe.statusMessage, avatarUrl)
+  const currentStatusMessage = chatMe.statusMessage ?? ''
+  const currentVisibleStatusMessage = stripAvatarStatusPayload(currentStatusMessage)
+  const fallbackVisibleStatusMessage = stripAvatarStatusPayload(fallbackStatusMessage)
+  const baseStatusMessage = currentVisibleStatusMessage
+    ? currentStatusMessage
+    : fallbackVisibleStatusMessage
+  const nextStatusMessage = embedAvatarStatusPayload(baseStatusMessage, avatarUrl)
   if (nextStatusMessage !== (chatMe.statusMessage ?? '')) {
     await lcu.setStatusMessage(nextStatusMessage)
   }

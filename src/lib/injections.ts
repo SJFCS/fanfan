@@ -19,6 +19,7 @@ import type { Availability, ChatMe } from '@/lib/lcu'
 import { sleep } from '@/lib/utils'
 import { getPuuid } from '@/lib/assets'
 import { getUpdateState, onUpdateStateChange } from '@/lib/update-checker'
+import { stripAvatarStatusPayload } from '@/lib/features/beautify-client/avatar-status-sync'
 
 /** 通用标记：标识已被 Sona 接管的 DOM 元素，防止重复绑定 */
 const HIJACKED_ATTR = 'data-sona-hijacked'
@@ -99,17 +100,19 @@ const AVAILABILITY_OPTIONS: { value: Availability; label: string }[] = [
 
 /** 当前状态缓存（从 store 初始化） */
 let currentAvailability: Availability = store.get('availability') as Availability
+let statusPersistencePausedForVerify = false
 
 /** 获取当前账号保存的签名 */
 function getSavedStatus(): string {
-  return store.get('statusMessage')[getPuuid()] ?? ''
+  return stripAvatarStatusPayload(store.get('statusMessage')[getPuuid()] ?? '')
 }
 
 /** 保存当前账号的签名 */
 function setSavedStatus(msg: string) {
+  const visibleStatus = stripAvatarStatusPayload(msg)
   const map = { ...store.get('statusMessage') }
-  if (msg) {
-    map[getPuuid()] = msg
+  if (visibleStatus) {
+    map[getPuuid()] = visibleStatus
   } else {
     delete map[getPuuid()]
   }
@@ -167,7 +170,7 @@ async function restoreAvailabilityAndStatus() {
     //    - 客户端无签名（null / 非字符串 / 空字符串） + store 有有效签名 → 写入
     //    - 客户端有有效签名 → 同步到 store
     //    - 非字符串 / 空字符串 一律不写入 store，避免空值污染
-    const clientStatus = hasContent(me.statusMessage) ? (me.statusMessage as string) : ''
+    const clientStatus = hasContent(me.statusMessage) ? stripAvatarStatusPayload(me.statusMessage as string) : ''
     if (clientStatus === '' && hasContent(savedStatus)) {
       try {
         await lcu.setStatusMessage(savedStatus)
@@ -206,14 +209,13 @@ async function restoreAvailabilityAndStatus() {
  *     - 如果和 store 还不一致 → 再写一次（此时客户端已经稳定，写入一定生效）
  *     - 如果一致 → restore 是真成功了，什么都不做
  */
-async function verifyAfterSubscribe() {
-  // 给客户端足够时间完成启动期所有 presence 同步，实测两秒左右比较合适
-  await sleep(2000)
+const AVAILABILITY_VERIFY_DELAYS_MS = [2000, 3000, 4000] as const
 
+async function verifyAvailabilitySnapshot(label: string) {
   try {
     const phase = await lcu.getGameflowPhase()
     if (phase !== 'None' && phase !== 'Lobby') {
-      logger.info('[Availability] 延迟校验时阶段为 %s，跳过', phase)
+      logger.info('[Availability] 延迟校验(%s)时阶段为 %s，跳过', label, phase)
       return
     }
 
@@ -221,31 +223,47 @@ async function verifyAfterSubscribe() {
     const savedAvailability = store.get('availability') as Availability
     const savedStatus = getSavedStatus()
 
-    const clientStatus = hasContent(me.statusMessage) ? (me.statusMessage as string) : ''
+    const clientStatus = hasContent(me.statusMessage) ? stripAvatarStatusPayload(me.statusMessage as string) : ''
 
     logger.info(
-      '[Availability] 延迟校验快照: client.availability=%s, client.statusMessage=%s | saved.availability=%s, saved.statusMessage=%s',
+      '[Availability] 延迟校验(%s)快照: client.availability=%s, client.statusMessage=%s | saved.availability=%s, saved.statusMessage=%s',
+      label,
       me.availability, JSON.stringify(me.statusMessage),
       savedAvailability, JSON.stringify(savedStatus),
     )
 
     // 校验 availability
     if (savedAvailability && savedAvailability !== me.availability) {
-      logger.warn('[Availability] 延迟校验发现 availability 被客户端回退，再次写入: %s', savedAvailability)
+      logger.warn('[Availability] 延迟校验(%s)发现 availability 被客户端回退，再次写入: %s', label, savedAvailability)
       await lcu.setAvailability(savedAvailability).catch((err) => {
-        logger.warn('[Availability] 延迟校验写 availability 失败:', err)
+        logger.warn('[Availability] 延迟校验(%s)写 availability 失败:', label, err)
       })
     }
 
     // 校验 statusMessage
     if (hasContent(savedStatus) && clientStatus !== savedStatus) {
-      logger.warn('[Availability] 延迟校验发现 statusMessage 被客户端回退（"%s" → "%s"），再次写入', savedStatus, clientStatus)
+      logger.warn('[Availability] 延迟校验(%s)发现 statusMessage 被客户端回退（"%s" → "%s"），再次写入', label, savedStatus, clientStatus)
       await lcu.setStatusMessage(savedStatus).catch((err) => {
-        logger.warn('[Availability] 延迟校验写 statusMessage 失败:', err)
+        logger.warn('[Availability] 延迟校验(%s)写 statusMessage 失败:', label, err)
       })
     }
   } catch (err) {
-    logger.warn('[Availability] 延迟校验失败:', err)
+    logger.warn('[Availability] 延迟校验(%s)失败:', label, err)
+  }
+}
+
+async function verifyAfterSubscribe() {
+  // 客户端启动期 presence 可能多次晚到回写，分多轮保护签名/在线状态。
+  try {
+    let elapsed = 0
+    for (const delay of AVAILABILITY_VERIFY_DELAYS_MS) {
+      await sleep(delay - elapsed)
+      elapsed = delay
+      await verifyAvailabilitySnapshot(`${delay}ms`)
+    }
+  } finally {
+    statusPersistencePausedForVerify = false
+    logger.info('[Availability] 延迟校验保护期结束，恢复签名变化持久化')
   }
 }
 
@@ -283,13 +301,18 @@ function subscribeChatMeSync() {
       return
     }
 
-    // 同步签名：只有"有效字符串"（非空、非 null、非其他类型）才写 store，
-    // 避免客户端偶尔推送 null/undefined/'' 时覆盖掉已有的有效签名
-    if (hasContent(me.statusMessage)) {
+    // 同步签名：启动延迟校验保护期内不写 store，避免把客户端回退/头像零宽补写
+    // 这类临时状态误认为玩家主动改签名。
+    if (statusPersistencePausedForVerify) {
+      if (hasContent(me.statusMessage)) {
+        logger.info('[Availability] 延迟校验保护期内忽略签名变化，不持久化: %s', me.statusMessage)
+      }
+    } else if (hasContent(me.statusMessage)) {
+      const visibleStatusMessage = stripAvatarStatusPayload(me.statusMessage as string)
       const savedStatus = getSavedStatus()
-      if (me.statusMessage !== savedStatus) {
-        setSavedStatus(me.statusMessage as string)
-        logger.info('[Availability] 签名变化 → 已持久化: %s', me.statusMessage)
+      if (hasContent(visibleStatusMessage) && visibleStatusMessage !== savedStatus) {
+        setSavedStatus(visibleStatusMessage)
+        logger.info('[Availability] 签名变化 → 已持久化: %s', visibleStatusMessage)
       }
     }
 
@@ -567,6 +590,7 @@ export function registerAllInjections() {
   //   "本地同步"而非事件路径，导致 listener 根本没触发。所以最稳的办法是：订阅后主动再核一次。
   restoreAvailabilityAndStatus().finally(() => {
     // 无论 restore 成功或失败，都要挂监听——否则玩家之后改签名就没法捕获
+    statusPersistencePausedForVerify = true
     subscribeChatMeSync()
     // 挂监听后再做一次延迟校验（fire-and-forget，不阻塞 injector.start）
     verifyAfterSubscribe()

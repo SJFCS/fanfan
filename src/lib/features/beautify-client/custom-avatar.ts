@@ -7,9 +7,11 @@ import { translate } from '@/i18n'
 import {
   clearAvatarUrlFromStatusMessage,
   decodeAvatarStatusPayload,
+  stripAvatarStatusPayload,
   uploadAvatarToImgbb,
   writeAvatarUrlToStatusMessage,
 } from '@/lib/features/beautify-client/avatar-status-sync'
+import { getPuuid } from '@/lib/assets'
 import type { ChatFriend } from '@/lib/lcu'
 
 const OWN_SOCIAL_AVATAR_SELECTOR = '.lol-social-avatar.identity-icon img.icon-image'
@@ -208,6 +210,10 @@ function hasFriendStatusMessage(friend: ChatFriend): boolean {
   return 'statusMessage' in friend
 }
 
+function isFriendOffline(friend: ChatFriend): boolean {
+  return friend.availability === 'offline'
+}
+
 function updateRemoteAvatarFromFriendStatus(friend: ChatFriend): boolean {
   const puuid = normalizePuuid(friend.puuid)
   if (!puuid) return false
@@ -215,6 +221,9 @@ function updateRemoteAvatarFromFriendStatus(friend: ChatFriend): boolean {
 
   const avatarUrl = decodeAvatarStatusPayload(getFriendStatusMessage(friend))
   if (!avatarUrl) {
+    // 离线好友的 presence 通常不携带签名。此时保留上次解析到的头像缓存，
+    // 只有在线好友明确没有隐藏 URL 时，才认为对方取消了自定义头像。
+    if (isFriendOffline(friend)) return false
     if (!remoteAvatarCache.has(puuid) && !store.get('customAvatarRemoteCache')[puuid]) return false
 
     remoteAvatarCache.delete(puuid)
@@ -237,6 +246,11 @@ function getSavedOwnRemoteAvatarUrl(): string {
   return typeof avatarUrl === 'string' ? avatarUrl : ''
 }
 
+function getSavedOwnVisibleStatusMessage(): string {
+  const savedStatusMessage = store.get('statusMessage')
+  return stripAvatarStatusPayload(savedStatusMessage[getPuuid()] || savedStatusMessage[getOwnPuuid()] || '')
+}
+
 function shouldRestoreOwnAvatarStatus(statusMessage: string | null | undefined): boolean {
   if (store.get('customAvatarAssetPaths').length === 0) return false
 
@@ -255,13 +269,13 @@ function ensureOwnAvatarStatusPayload(statusMessage?: string | null) {
   ownStatusRestorePromise = (async () => {
     if (statusMessage !== undefined) {
       if (!shouldRestoreOwnAvatarStatus(statusMessage)) return
-      await writeAvatarUrlToStatusMessage(savedAvatarUrl)
+      await writeAvatarUrlToStatusMessage(savedAvatarUrl, getSavedOwnVisibleStatusMessage())
       return
     }
 
     const chatMe = await lcu.getChatMe()
     if (shouldRestoreOwnAvatarStatus(chatMe.statusMessage)) {
-      await writeAvatarUrlToStatusMessage(savedAvatarUrl)
+      await writeAvatarUrlToStatusMessage(savedAvatarUrl, getSavedOwnVisibleStatusMessage())
     }
   })()
     .catch((err) => {
@@ -767,7 +781,7 @@ export async function syncCustomAvatarAssetPath(assetPath: string) {
   const avatarUrl = await uploadAvatarToImgbb(image)
   remoteAvatarCache.set(ownPuuid, avatarUrl)
   persistRemoteAvatarCacheEntry(ownPuuid, avatarUrl)
-  await writeAvatarUrlToStatusMessage(avatarUrl)
+  await writeAvatarUrlToStatusMessage(avatarUrl, getSavedOwnVisibleStatusMessage())
   scheduleApplyCustomAvatar()
   await lcu.sendNotification(translate('notification.avatarSync.title'), translate('notification.avatarSync.details')).catch(() => {})
 
