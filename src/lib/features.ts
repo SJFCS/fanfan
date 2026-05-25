@@ -622,20 +622,39 @@ async function analyzeTeammates() {
 
     logger.info('┌─── 队友战绩分析 ───')
 
-    const chatLines: string[] = [translate('champSelect.teamAnalysis.header', { count: fetchCount })]
-    const teamPowerTitles = assignTeamPowerTitles(stats)
+    const displayMode = store.get('analyzeTeamPowerDisplayMode') || 'legacy'
+    const isLegacy = displayMode === 'legacy'
+
+    const chatLines: string[] = [isLegacy
+      ? 'Sona ♫   队友卡池一览(本模式战绩):\n'
+      : `Sona ♫   队友卡池一览(本模式近${fetchCount}场战绩):\n`
+    ]
+
+    const teamPowerTitles = isLegacy ? null : assignTeamPowerTitles(stats)
 
     for (const s of stats) {
       const floor = translate('champSelect.teamAnalysis.floor', { floor: s.floor })
       if (s.winRate == null) {
         logger.info('│ %s — %s#%s — 无近期战绩或查询失败', floor, s.gameName, s.tagLine)
-        chatLines.push(translate('champSelect.teamAnalysis.emptyLine', { floor }))
+        chatLines.push(isLegacy ? `${floor}: 🆕 萌新上线 (无战绩)` : `${floor}: 🆕 萌新上线|胜率--|综合评分--`)
         continue
       }
 
       const winRate = s.winRate.toFixed(1)
       const kdaStr = s.kdaNum >= 99 ? 'Perfect' : s.kdaNum.toFixed(2)
-      const title = teamPowerTitles.get(getTeammateStatsKey(s)) ?? translate('strength.teamTier.newbie')
+      if (isLegacy) {
+        const rating = getRating(s.winRate, s.kdaNum)
+        logger.info(
+          '│ %s — %s#%s — 近%d场 胜率: %s%% (%d胜%d负) | KDA: %s (%.1f/%.1f/%.1f) | %s',
+          floor, s.gameName, s.tagLine,
+          s.total, winRate, s.wins, s.total - s.wins,
+          kdaStr, s.avgK, s.avgD, s.avgA, rating,
+        )
+        chatLines.push(`${floor}: ${rating} | 胜率${winRate}% | KDA ${kdaStr}`)
+        continue
+      }
+
+      const title = teamPowerTitles?.get(getTeammateStatsKey(s)) ?? '🆕 萌新上线'
       const scoreText = s.strengthScore ? s.strengthScore.score.toFixed(1) : '--'
 
       logger.info(
