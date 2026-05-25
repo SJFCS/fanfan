@@ -148,12 +148,12 @@ function mountApp() {
   logger.info('Mounted ✓ (container connected: %s)', String(container.isConnected))
 
   if (!runtime.hasShownStartupToast) {
-    Toast.success('Sona 已启动 ♫')
+    // Toast.success('Sona 已启动 ♫')
     runtime.hasShownStartupToast = true
   }
 
   if (!runtime.hasShownSpecialDayToast && isSpecialDay()) {
-    Toast.success('today is a special day! 🎉')
+    // Toast.success('today is a special day! 🎉')
     runtime.hasShownSpecialDayToast = true
   }
 }

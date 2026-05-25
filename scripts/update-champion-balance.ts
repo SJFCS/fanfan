@@ -96,7 +96,7 @@ async function fetchLuaSource(): Promise<string> {
   console.log(`[update-balance] 从 Fandom Wiki API 拉取: ${WIKI_API_URL}`)
   const res = await fetch(WIKI_API_URL, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; SonaBot/1.0; +https://github.com/WJZ-P/sona)',
+      'User-Agent': 'Mozilla/5.0 (compatible; SonaBot/1.0; +https://github.com/SJFCS/fanfan)',
     },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)

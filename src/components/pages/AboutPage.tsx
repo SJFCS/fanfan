@@ -11,7 +11,7 @@ export function AboutPage() {
   return (
     <div className="sona-about">
       <div className="sona-about-header">
-        <h2 className="sona-about-title">Sona</h2>
+        <h2 className="sona-about-title">FanFan</h2>
         <span className="sona-about-version">v{__PLUGIN_VERSION__}</span>
       </div>
 
@@ -22,7 +22,7 @@ export function AboutPage() {
       {/* 信息卡片 + 技术栈 并排 */}
       <div className="sona-about-row">
         <div className="sona-about-cards">
-          <InfoCard icon={<ZapIcon />} label={t('about.card.plugin')} value={`Sona v${__PLUGIN_VERSION__}`} />
+          <InfoCard icon={<ZapIcon />} label={t('about.card.plugin')} value={`FanFan v${__PLUGIN_VERSION__}`} />
           <InfoCard icon={<CodeIcon />} label={t('about.card.framework')} value="React + Vite" />
           <InfoCard
             icon={<BoxIcon />}
@@ -41,17 +41,22 @@ export function AboutPage() {
           </ul>
           <a
             className="sona-hex-card sona-hex-card-link"
-            href="https://github.com/WJZ-P/sona"
+            href="https://github.com/SJFCS/fanfan"
             target="_blank"
             rel="noopener noreferrer"
           >
             <span className="sona-hex-card-icon"><GitHubIcon /></span>
             <div className="sona-hex-card-text">
               <span className="sona-hex-card-label">GitHub</span>
-              <span className="sona-hex-card-value">WJZ-P/sona</span>
+              <span className="sona-hex-card-value">SJFCS/fanfan</span>
             </div>
           </a>
         </div>
+      </div>
+
+      <div className="sona-about-section">
+        <h3 className="sona-about-section-title">{t('about.credits')}</h3>
+        <p className="sona-about-text">{t('about.creditsDesc')}</p>
       </div>
 
       <div className="sona-about-section">
@@ -60,7 +65,7 @@ export function AboutPage() {
       </div>
 
       <div className="sona-about-quote">
-        Made by WJZ_P with love ❤. 
+        Made by SJFCS with love ❤. 
         {/* But he has lost the one he loved. */}
       </div>
     </div>

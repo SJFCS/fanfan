@@ -119,7 +119,7 @@ export function HomePage() {
     <div className="sona-home">
       {/* SONA 标题 */}
       <h1 className="sona-home-brand">
-        <span className="sona-home-brand-text">SONA</span>
+        <span className="sona-home-brand-text">FanFan</span>
       </h1>
 
       {/* 头像 + 粒子 */}
@@ -141,13 +141,6 @@ export function HomePage() {
           {t('home.subtitle')}
         </p>
       </div>
-
-      {/* 琴女语录 */}
-      <p className="sona-home-quote">
-        {t('home.quote')}
-        <br />
-        &nbsp;{t('home.quoteAuthor')}
-      </p>
     </div>
   )
 }

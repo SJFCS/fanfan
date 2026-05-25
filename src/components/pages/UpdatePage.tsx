@@ -4,9 +4,6 @@ import { checkForUpdates, getReleasePageUrl, getUpdateState, onUpdateStateChange
 import { useI18n } from '@/i18n'
 import '@/styles/UpdatePage.css'
 
-const GROUP_FILE_URL = ''
-const QUARK_URL = 'https://pan.quark.cn/s/72e3caf2e3d9'
-
 function formatPublishedDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
@@ -52,22 +49,9 @@ export function UpdatePage() {
               {info.publishedAt && <time dateTime={info.publishedAt}>{formatPublishedDate(info.publishedAt)}</time>}
             </div>
             <pre className="sona-update-notes">{info.releaseBody}</pre>
-          </div>
-
-          <div className="sona-update-download">
-            <h3>{t('update.downloadTitle')}</h3>
-            <p>{t('update.downloadDescription')}</p>
-            <div className="sona-update-actions">
-              <SonaButton variant="primary" onClick={() => openUrl(info.releaseUrl || getReleasePageUrl())}>
+              <SonaButton variant="primary" style={{ marginTop: '16px' }} onClick={() => openUrl(info.releaseUrl || getReleasePageUrl())}>
                 {t('update.openRelease')}
               </SonaButton>
-              <SonaButton onClick={() => openUrl(GROUP_FILE_URL)} disabled={!GROUP_FILE_URL}>
-                {t('update.groupFile')}
-              </SonaButton>
-              <SonaButton onClick={() => openUrl(QUARK_URL)} disabled={!QUARK_URL}>
-                {t('update.quark')}
-              </SonaButton>
-            </div>
           </div>
         </>
       ) : (

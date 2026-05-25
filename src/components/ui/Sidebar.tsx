@@ -29,7 +29,7 @@ export function Sidebar({ items, activeId, onSelect, collapsed, onToggle }: Side
         <span className="sona-sidebar-logo-icon"><MusicIcon /></span>
         {!collapsed && (
           <span className="sona-sidebar-logo-title">
-            <span className="sona-sidebar-logo-text">Sona</span>
+            <span className="sona-sidebar-logo-text">FanFan</span>
             <span className="sona-sidebar-logo-version">v{__PLUGIN_VERSION__}</span>
           </span>
         )}
