@@ -27,12 +27,9 @@ function tryHijackBenchItems(): boolean {
   const container = document.querySelector('.bench-container')
   if (!container) return true
 
-  // 视觉：移除 on-cooldown 类名和遮罩
-  container.querySelectorAll('[class*="on-cooldown"]').forEach((el) => {
-    const toRemove = Array.from(el.classList).filter((c) => c.startsWith('on-cooldown'))
-    toRemove.forEach((c) => el.classList.remove(c))
-    const mask = el.querySelector('.cooldown-mask')
-    if (mask instanceof HTMLElement) mask.style.display = 'none'
+  // 视觉：保留冷却进度条/遮罩，但让它不拦截点击（否则会点不到 bench item）
+  container.querySelectorAll('.cooldown-mask').forEach((mask) => {
+    if (mask instanceof HTMLElement) mask.style.pointerEvents = 'none'
   })
 
   // 逻辑：接管未被接管的 bench item 的点击事件
