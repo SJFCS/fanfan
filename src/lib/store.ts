@@ -82,6 +82,8 @@ export interface SonaConfig {
   analyzeTeamPowerMsgType: string
   /** 战绩查询局数（20/50/100），默认50 */
   analyzeTeamPowerFetchCount: number
+  /** 队友战绩分析展示风格：legacy=老版幽默评价，strength=新版综合评分 */
+  analyzeTeamPowerDisplayMode: 'legacy' | 'strength'  
   /** 英雄选择增强查询局数（20/50/100），默认50 */
   champSelectAssistFetchCount: number
   /** 全局战力分析查询局数（20/50/100），默认50 */
@@ -213,6 +215,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   analyzeTeamPower: false,
   analyzeTeamPowerMsgType: 'celebration',
   analyzeTeamPowerFetchCount: 50,
+  analyzeTeamPowerDisplayMode: 'legacy',
   champSelectAssistFetchCount: 50,
   gameAnalysisFetchCount: 50,
   sideIndicator: false,

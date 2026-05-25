@@ -158,6 +158,7 @@ export function ToolsPage() {
   const [analyzeTeamPower, setAnalyzeTeamPower] = useState(store.get('analyzeTeamPower'))
   const [analyzeTeamPowerMsgType, setAnalyzeTeamPowerMsgType] = useState(store.get('analyzeTeamPowerMsgType'))
   const [analyzeTeamPowerFetchCount, setAnalyzeTeamPowerFetchCount] = useState(store.get('analyzeTeamPowerFetchCount'))
+  const [analyzeTeamPowerDisplayMode, setAnalyzeTeamPowerDisplayMode] = useState(store.get('analyzeTeamPowerDisplayMode'))  
   const [champSelectAssistFetchCount, setChampSelectAssistFetchCount] = useState(store.get('champSelectAssistFetchCount'))
   const [gameAnalysisFetchCount, setGameAnalysisFetchCount] = useState(store.get('gameAnalysisFetchCount'))
   const [sideIndicator, setSideIndicator] = useState(store.get('sideIndicator'))
@@ -436,6 +437,18 @@ export function ToolsPage() {
             onChange={(v) => { setAnalyzeTeamPowerFetchCount(Number(v)); store.set('analyzeTeamPowerFetchCount', Number(v)) }}
             options={recentOptions}
           />
+          <SonaSelect
+            value={analyzeTeamPowerDisplayMode}
+            onChange={(v) => {
+              const mode = v as 'legacy' | 'strength'
+              setAnalyzeTeamPowerDisplayMode(mode)
+              store.set('analyzeTeamPowerDisplayMode', mode)
+            }}
+            options={[
+              { value: 'legacy', label: '幽默评价' },
+              { value: 'strength', label: '赛马评价' },
+            ]}
+          />          
           <SonaSelect
             value={analyzeTeamPowerMsgType}
             onChange={(v) => { setAnalyzeTeamPowerMsgType(v); store.set('analyzeTeamPowerMsgType', v) }}
