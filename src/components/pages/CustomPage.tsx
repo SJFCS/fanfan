@@ -234,6 +234,15 @@ export function CustomPage() {
       cancelScheduledCustomAvatarSync()
       setShowAvatarInput(false)
       setIsAvatarDropActive(false)
+      setAssetMessage(t('beautify.assets.instructions'))
+    } else {
+      const currentPath = customAvatarActiveAssetPath ?? customAvatarAssetPaths[0]
+      if (currentPath) {
+        scheduleCustomAvatarSync(currentPath)
+      } else {
+        cancelScheduledCustomAvatarSync()
+        setAssetMessage(t('beautify.assets.instructions'))
+      }
     }
     setCustomAvatarMode(enabled)
     store.set('customAvatarMode', enabled)
@@ -544,32 +553,50 @@ export function CustomPage() {
 
   const syncCustomAvatarAssetPathToCloud = async (assetPath: string) => {
     try {
+      const currentPath = store.get('customAvatarActiveAssetPath') ?? store.get('customAvatarAssetPaths')[0]
       if (!store.get('customAvatarMode')) return
-      if (!store.get('customAvatarAssetPaths').includes(assetPath)) return
-      if ((store.get('customAvatarActiveAssetPath') ?? store.get('customAvatarAssetPaths')[0]) !== assetPath) return
+      if (currentPath !== assetPath) return
 
       const blob = await createCustomAvatarImageBlob(assetPath)
+      const nextPath = store.get('customAvatarActiveAssetPath') ?? store.get('customAvatarAssetPaths')[0]
+      if (!store.get('customAvatarMode')) return
+      if (nextPath !== assetPath) return
+
       await syncCustomAvatarAssetPath(assetPath, blob)
+      if (!store.get('customAvatarMode')) return
+      if ((store.get('customAvatarActiveAssetPath') ?? store.get('customAvatarAssetPaths')[0]) !== assetPath) return
+
       setAssetMessage(t('beautify.status.avatarSynced', { path: assetPath }))
     } catch (err) {
-      setAssetMessage(t('beautify.status.avatarSyncFailed', { error: err instanceof Error ? err.message : String(err) }))
+      if (store.get('customAvatarMode') && (store.get('customAvatarActiveAssetPath') ?? store.get('customAvatarAssetPaths')[0]) === assetPath) {
+        setAssetMessage(t('beautify.status.avatarSyncFailed', { error: err instanceof Error ? err.message : String(err) }))
+      }
     }
   }
 
   const cancelScheduledCustomAvatarSync = () => {
     if (avatarSyncTimerRef.current != null) {
-      window.clearTimeout(avatarSyncTimerRef.current)
+      window.clearInterval(avatarSyncTimerRef.current)
       avatarSyncTimerRef.current = null
     }
   }
 
   const scheduleCustomAvatarSync = (assetPath: string) => {
     cancelScheduledCustomAvatarSync()
-    setAssetMessage(t('beautify.avatar.syncing'))
-    avatarSyncTimerRef.current = window.setTimeout(() => {
-      avatarSyncTimerRef.current = null
+    const totalSeconds = Math.max(1, Math.ceil(CUSTOM_AVATAR_SYNC_DELAY_MS / 1000))
+    let remainingSeconds = totalSeconds
+    setAssetMessage(`${t('beautify.avatar.waitingSync')} ${remainingSeconds}s`)
+    avatarSyncTimerRef.current = window.setInterval(() => {
+      remainingSeconds -= 1
+      if (remainingSeconds > 0) {
+        setAssetMessage(`${t('beautify.avatar.waitingSync')} ${remainingSeconds}s`)
+        return
+      }
+
+      cancelScheduledCustomAvatarSync()
+      setAssetMessage(t('beautify.avatar.syncing'))
       void syncCustomAvatarAssetPathToCloud(assetPath)
-    }, CUSTOM_AVATAR_SYNC_DELAY_MS)
+    }, 1000)
   }
 
   const addCustomAvatarAssetPath = (assetPath: string) => {
@@ -619,12 +646,15 @@ export function CustomPage() {
     removeAssetPathEverywhere(assetPath)
     if (nextPaths.length === 0) {
       saveCustomAvatarActiveAssetPath(null)
+      cancelScheduledCustomAvatarSync()
+      setAssetMessage(t('beautify.assets.instructions'))
     }
     setAssetMessage(t('beautify.status.avatarRemoved', { path: assetPath }))
     if (isActivePath && nextActivePath) {
       scheduleCustomAvatarSync(nextActivePath)
     } else if (isActivePath) {
       cancelScheduledCustomAvatarSync()
+      setAssetMessage(t('beautify.assets.instructions'))
     }
   }
 
