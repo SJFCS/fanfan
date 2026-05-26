@@ -573,11 +573,31 @@
   user-select: none;
 }
 
+.sona-wallpaper-preview-stage {
+  position: absolute;
+  pointer-events: none;
+  transform-origin: center center;
+}
+
 .sona-wallpaper-adjust-frame-guide {
   position: absolute;
+  pointer-events: none;
+}
+
+.sona-wallpaper-preview-stage img,
+.sona-wallpaper-preview-stage video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.sona-wallpaper-adjust-frame-guide {
   inset: 14px;
   border: 1px dashed rgba(240, 230, 210, 0.5);
-  pointer-events: none;
   box-shadow: 0 0 0 999px rgba(1, 10, 19, 0.12);
 }
 
