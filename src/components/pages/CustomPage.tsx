@@ -54,6 +54,11 @@ interface AvatarDragStart {
   offsetY: number
 }
 
+interface PendingSharedAssetRemoval {
+  assetPath: string
+  source: 'asset' | 'wallpaper' | 'avatar'
+}
+
 function isImageFile(fileName: string): boolean {
   const ext = fileName.split('.').pop()?.toLowerCase()
   return Boolean(ext && IMAGE_EXTENSIONS.has(ext))
@@ -172,6 +177,7 @@ export function CustomPage() {
   const [assetMessage, setAssetMessage] = useState(() => t('beautify.assets.instructions'))
   const [editingWallpaperAssetPath, setEditingWallpaperAssetPath] = useState<string | null>(null)
   const [editingAvatarAssetPath, setEditingAvatarAssetPath] = useState<string | null>(null)
+  const [pendingSharedAssetRemoval, setPendingSharedAssetRemoval] = useState<PendingSharedAssetRemoval | null>(null)
   const [draftWallpaperAdjustment, setDraftWallpaperAdjustment] = useState<WallpaperAdjustment>(DEFAULT_WALLPAPER_ADJUSTMENT)
   const [draftAvatarAdjustment, setDraftAvatarAdjustment] = useState<AvatarAdjustment>(DEFAULT_AVATAR_ADJUSTMENT)
   const [isHomepageBackgroundDropActive, setIsHomepageBackgroundDropActive] = useState(false)
@@ -298,7 +304,16 @@ export function CustomPage() {
     }
   }
 
-  const removeAssetPath = (assetPath: string) => {
+  const requestSharedAssetRemoval = (assetPath: string, source: PendingSharedAssetRemoval['source']) => {
+    if (!homepageBackgroundAssetPaths.includes(assetPath) || !customAvatarAssetPaths.includes(assetPath)) {
+      return true
+    }
+
+    setPendingSharedAssetRemoval({ assetPath, source })
+    return false
+  }
+
+  const removeAssetPathEverywhere = (assetPath: string) => {
     const nextPaths = assetPaths.filter((path) => path !== assetPath)
     const nextHomepageBackgroundAssetPaths = homepageBackgroundAssetPaths.filter((path) => path !== assetPath)
     const nextHomepageBackgroundAdjustments = { ...homepageBackgroundAdjustments }
@@ -320,7 +335,17 @@ export function CustomPage() {
     if (homepageBackgroundAssetPath === assetPath) {
       saveHomepageBackgroundAssetPath(nextHomepageBackgroundAssetPaths[0] ?? null)
     }
+  }
+
+  const removeAssetPathConfirmed = (assetPath: string) => {
+    removeAssetPathEverywhere(assetPath)
     setAssetMessage(t('beautify.status.assetRemoved', { path: assetPath }))
+  }
+
+  const removeAssetPath = (assetPath: string) => {
+    if (!requestSharedAssetRemoval(assetPath, 'asset')) return
+
+    removeAssetPathConfirmed(assetPath)
   }
 
   const applyHomepageBackgroundAssetPath = (assetPath: string) => {
@@ -367,20 +392,15 @@ export function CustomPage() {
     return true
   }
 
-  const removeHomepageBackgroundAssetPath = (assetPath: string) => {
-    const nextPaths = homepageBackgroundAssetPaths.filter((path) => path !== assetPath)
-    const nextAdjustments = { ...homepageBackgroundAdjustments }
-    delete nextAdjustments[assetPath]
-    saveAssetPaths(assetPaths.filter((path) => path !== assetPath))
-    saveHomepageBackgroundAssetPaths(nextPaths)
-    saveHomepageBackgroundAdjustments(nextAdjustments)
-    if (store.get('beautifyHomepageBackgroundLastRandomAssetPath') === assetPath) {
-      store.set('beautifyHomepageBackgroundLastRandomAssetPath', null)
-    }
-    if (homepageBackgroundAssetPath === assetPath) {
-      saveHomepageBackgroundAssetPath(nextPaths[0] ?? null)
-    }
+  const removeHomepageBackgroundAssetPathConfirmed = (assetPath: string) => {
+    removeAssetPathEverywhere(assetPath)
     setAssetMessage(t('beautify.status.wallpaperRemoved', { path: assetPath }))
+  }
+
+  const removeHomepageBackgroundAssetPath = (assetPath: string) => {
+    if (!requestSharedAssetRemoval(assetPath, 'wallpaper')) return
+
+    removeHomepageBackgroundAssetPathConfirmed(assetPath)
   }
 
   const openHomepageBackgroundAdjustModal = (assetPath: string) => {
@@ -634,23 +654,40 @@ export function CustomPage() {
     return true
   }
 
-  const removeCustomAvatarAssetPath = (assetPath: string) => {
+  const removeCustomAvatarAssetPathConfirmed = (assetPath: string) => {
     const nextPaths = customAvatarAssetPaths.filter((path) => path !== assetPath)
-    const nextAdjustments = { ...customAvatarAdjustments }
     const isActivePath = (customAvatarActiveAssetPath ?? customAvatarAssetPaths[0]) === assetPath
     const nextActivePath = isActivePath ? nextPaths[0] ?? null : customAvatarActiveAssetPath
-    delete nextAdjustments[assetPath]
-    saveAssetPaths(assetPaths.filter((path) => path !== assetPath))
-    saveCustomAvatarAssetPaths(nextPaths)
-    saveCustomAvatarAdjustments(nextAdjustments)
-    if (isActivePath) {
-      saveCustomAvatarActiveAssetPath(nextActivePath)
-    }
+    removeAssetPathEverywhere(assetPath)
     setAssetMessage(t('beautify.status.avatarRemoved', { path: assetPath }))
     if (isActivePath && nextActivePath) {
       scheduleCustomAvatarSync(nextActivePath)
     } else if (isActivePath) {
       cancelScheduledCustomAvatarSync()
+    }
+  }
+
+  const removeCustomAvatarAssetPath = (assetPath: string) => {
+    if (!requestSharedAssetRemoval(assetPath, 'avatar')) return
+
+    removeCustomAvatarAssetPathConfirmed(assetPath)
+  }
+
+  const closeSharedAssetRemovalModal = () => {
+    setPendingSharedAssetRemoval(null)
+  }
+
+  const confirmSharedAssetRemoval = () => {
+    const pending = pendingSharedAssetRemoval
+    if (!pending) return
+
+    setPendingSharedAssetRemoval(null)
+    if (pending.source === 'asset') {
+      removeAssetPathConfirmed(pending.assetPath)
+    } else if (pending.source === 'wallpaper') {
+      removeHomepageBackgroundAssetPathConfirmed(pending.assetPath)
+    } else {
+      removeCustomAvatarAssetPathConfirmed(pending.assetPath)
     }
   }
 
@@ -1355,6 +1392,34 @@ export function CustomPage() {
             </SonaButton>
             <SonaButton onClick={saveHomepageBackgroundAdjustment}>
               {t('beautify.wallpaper.saveCrop')}
+            </SonaButton>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(pendingSharedAssetRemoval)}
+        onClose={closeSharedAssetRemovalModal}
+        width={460}
+        height="auto"
+        maskClosable
+        closable={false}
+      >
+        <div className="sona-confirm-modal">
+          <div className="sona-confirm-modal-header">
+            <h3>{t('beautify.confirm.assetUsedTitle')}</h3>
+          </div>
+          <p className="sona-confirm-modal-message">
+            {pendingSharedAssetRemoval
+              ? t('beautify.confirm.assetUsedByWallpaperAndAvatar', { path: pendingSharedAssetRemoval.assetPath })
+              : ''}
+          </p>
+          <div className="sona-confirm-modal-actions">
+            <SonaButton onClick={confirmSharedAssetRemoval}>
+              {t('common.confirm')}
+            </SonaButton>
+            <SonaButton onClick={closeSharedAssetRemovalModal}>
+              {t('common.cancel')}
             </SonaButton>
           </div>
         </div>
