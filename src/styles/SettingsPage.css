@@ -650,6 +650,42 @@
   margin-top: 18px;
 }
 
+.sona-confirm-modal {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 28px 24px;
+}
+
+.sona-confirm-modal-header h3 {
+  margin: 0;
+  color: #f0e6d2;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sona-confirm-modal-message {
+  margin: 0;
+  color: #cdbfa3;
+  font-size: 13px;
+  line-height: 1.65;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.sona-confirm-modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 10px;
+}
+
+.sona-confirm-modal-actions .sona-btn {
+  min-width: 96px;
+}
+
 .sona-avatar-dropzone {
   min-height: 150px;
   padding: 14px;
