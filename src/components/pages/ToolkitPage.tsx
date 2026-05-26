@@ -8,10 +8,11 @@ import { lcu } from '@/lib/lcu'
 import { logger } from '@/index'
 import { store } from '@/lib/store'
 import { useI18n } from '@/i18n'
-import type { ChatFriend } from '@/types/lcu'
+import type { ChatFriend, GameflowPhase } from '@/types/lcu'
 import '@/styles/SettingsPage.css'
 import '@/styles/ConfigLockPage.css'
 
+const ENDGAME_PHASES: GameflowPhase[] = ['WaitingForStats', 'PreEndOfGame', 'EndOfGame']
 
 export function ToolkitPage() {
   const { t } = useI18n()
@@ -31,6 +32,8 @@ export function ToolkitPage() {
   const [configDetailsOpen, setConfigDetailsOpen] = useState(false)
   const [restartingUx, setRestartingUx] = useState(false)
   const [restartUxError, setRestartUxError] = useState('')
+  const [gameflowAction, setGameflowAction] = useState<'playAgain' | 'leaveLobby' | null>(null)
+  const [gameflowStatus, setGameflowStatus] = useState('')
   const [spectateIdentity, setSpectateIdentity] = useState('')
   const [spectateStatus, setSpectateStatus] = useState('')
   const [isSpectating, setIsSpectating] = useState(false)
@@ -122,6 +125,52 @@ export function ToolkitPage() {
       setRestartUxError(err instanceof Error ? err.message : String(err))
     } finally {
       setRestartingUx(false)
+    }
+  }
+
+  const handlePlayAgain = async () => {
+    if (gameflowAction) return
+
+    setGameflowAction('playAgain')
+    setGameflowStatus('')
+
+    try {
+      const phase = await lcu.getGameflowPhase()
+      if (!ENDGAME_PHASES.includes(phase)) {
+        throw new Error(t('tools.gameflow.playAgain.notEndgame', { phase }))
+      }
+
+      await lcu.playAgain()
+      setGameflowStatus(t('tools.gameflow.playAgain.success'))
+      logger.info('[Toolkit] Requested play-again from endgame phase: %s', phase)
+    } catch (err) {
+      logger.error('[Toolkit] Failed to play again:', err)
+      setGameflowStatus(t('tools.gameflow.playAgain.failed', { error: err instanceof Error ? err.message : String(err) }))
+    } finally {
+      setGameflowAction(null)
+    }
+  }
+
+  const handleLeaveLobby = async () => {
+    if (gameflowAction) return
+
+    setGameflowAction('leaveLobby')
+    setGameflowStatus('')
+
+    try {
+      const phase = await lcu.getGameflowPhase()
+      if (phase !== 'Lobby') {
+        throw new Error(t('tools.gameflow.leaveLobby.notLobby', { phase }))
+      }
+
+      await lcu.leaveLobby()
+      setGameflowStatus(t('tools.gameflow.leaveLobby.success'))
+      logger.info('[Toolkit] Left current lobby')
+    } catch (err) {
+      logger.error('[Toolkit] Failed to leave lobby:', err)
+      setGameflowStatus(t('tools.gameflow.leaveLobby.failed', { error: err instanceof Error ? err.message : String(err) }))
+    } finally {
+      setGameflowAction(null)
     }
   }
 
@@ -236,6 +285,30 @@ export function ToolkitPage() {
 
       <SettingGroup title={t('tools.group.client')}>
         <div className="sona-config-lock-card">
+          <SettingCard
+            title={t('tools.gameflow.playAgain.title')}
+            description={t('tools.gameflow.playAgain.description')}
+          >
+            <SonaButton variant="primary" onClick={handlePlayAgain} disabled={gameflowAction !== null}>
+              {gameflowAction === 'playAgain' ? t('tools.gameflow.processing') : t('tools.gameflow.playAgain.button')}
+            </SonaButton>
+          </SettingCard>
+
+          <SettingCard
+            title={t('tools.gameflow.leaveLobby.title')}
+            description={t('tools.gameflow.leaveLobby.description')}
+          >
+            <SonaButton variant="secondary" onClick={handleLeaveLobby} disabled={gameflowAction !== null}>
+              {gameflowAction === 'leaveLobby' ? t('tools.gameflow.processing') : t('tools.gameflow.leaveLobby.button')}
+            </SonaButton>
+          </SettingCard>
+
+          {gameflowStatus && (
+            <div className="sona-config-action-error" style={{ color: '#cdbe91', borderColor: 'rgba(200, 170, 110, 0.28)', background: 'rgba(200, 170, 110, 0.08)' }}>
+              {gameflowStatus}
+            </div>
+          )}
+
           <SettingCard
             title={t('tools.restartUx.title')}
             description={t('tools.restartUx.description')}
