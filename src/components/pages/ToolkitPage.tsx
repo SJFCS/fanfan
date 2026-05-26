@@ -8,6 +8,7 @@ import { lcu } from '@/lib/lcu'
 import { logger } from '@/index'
 import { store } from '@/lib/store'
 import { useI18n } from '@/i18n'
+import type { ChatFriend } from '@/types/lcu'
 import '@/styles/SettingsPage.css'
 import '@/styles/ConfigLockPage.css'
 
@@ -30,6 +31,11 @@ export function ToolkitPage() {
   const [configDetailsOpen, setConfigDetailsOpen] = useState(false)
   const [restartingUx, setRestartingUx] = useState(false)
   const [restartUxError, setRestartUxError] = useState('')
+  const [spectateIdentity, setSpectateIdentity] = useState('')
+  const [spectateStatus, setSpectateStatus] = useState('')
+  const [isSpectating, setIsSpectating] = useState(false)
+  const [watchableFriends, setWatchableFriends] = useState<ChatFriend[]>([])
+  const [loadingWatchableFriends, setLoadingWatchableFriends] = useState(false)
 
   const handleSearchMatch = async () => {
     const parts = searchRiotId.trim().split('#')
@@ -119,6 +125,86 @@ export function ToolkitPage() {
     }
   }
 
+  const isPuuidLike = (value: string) => {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  }
+
+  const getSpectateTargetPuuid = async (identity: string) => {
+    const value = identity.trim()
+    if (!value) {
+      throw new Error(t('tools.spectate.empty'))
+    }
+
+    if (isPuuidLike(value)) {
+      return value
+    }
+
+    const [gameName, tagLine, ...rest] = value.split('#')
+    if (!gameName || !tagLine || rest.length > 0) {
+      throw new Error(t('tools.spectate.invalid'))
+    }
+
+    const summoner = await lcu.getSummonerByRiotId(gameName.trim(), tagLine.trim())
+    if (!summoner?.puuid) {
+      throw new Error(t('tools.spectate.notFound'))
+    }
+
+    return summoner.puuid
+  }
+
+  const launchSpectatorByPuuid = async (puuid: string, label: string) => {
+    setIsSpectating(true)
+    setSpectateStatus('')
+
+    try {
+      const phase = await lcu.getGameflowPhase()
+      if (phase !== 'None') {
+        throw new Error(t('tools.spectate.notIdle', { phase }))
+      }
+
+      const payload = await lcu.getSpectatorLaunchPayloadByPuuid(puuid).catch(() => null)
+      if (payload?.spectatorKey) {
+        await lcu.canSpectateBuddy(payload.puuid, payload.spectatorKey).catch(() => null)
+        await lcu.spectateBuddy(payload.puuid)
+      } else {
+        throw new Error(t('tools.spectate.needFriendKey'))
+      }
+      setSpectateStatus(t('tools.spectate.success'))
+      logger.info('[Spectate] Requested spectator launch for %s', label)
+    } catch (err) {
+      logger.error('[Spectate] Failed to launch spectator:', err)
+      setSpectateStatus(t('tools.spectate.failed', { error: err instanceof Error ? err.message : String(err) }))
+    } finally {
+      setIsSpectating(false)
+    }
+  }
+
+  const handleSpectate = async () => {
+    if (isSpectating) return
+
+    try {
+      const puuid = await getSpectateTargetPuuid(spectateIdentity)
+      await launchSpectatorByPuuid(puuid, spectateIdentity.trim())
+    } catch (err) {
+      setSpectateStatus(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const refreshWatchableFriends = async () => {
+    setLoadingWatchableFriends(true)
+    setSpectateStatus('')
+
+    try {
+      const friends = await lcu.getFriends()
+      setWatchableFriends(friends.filter((friend) => friend.lol?.gameStatus === 'inGame' && Boolean(friend.lol?.spectatorKey)))
+    } catch (err) {
+      logger.error('[Spectate] Failed to load friends:', err)
+      setSpectateStatus(t('tools.spectate.loadFriendsFailed'))
+    } finally {
+      setLoadingWatchableFriends(false)
+    }
+  }
+
   return (
     <div className="sona-settings">
       <h2 className="sona-settings-title">{t('tools.title')}</h2>
@@ -165,6 +251,45 @@ export function ToolkitPage() {
             </div>
           )}
         </div>
+      </SettingGroup>
+
+      <SettingGroup title={t('tools.group.spectate')}>
+        <p className="sona-subtitle" style={{ marginBottom: 10 }}>{t('tools.spectate.description')}</p>
+        <div className="sona-debug-actions" style={{ alignItems: 'flex-end', gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <SonaInput
+              value={spectateIdentity}
+              onChange={(v) => { setSpectateIdentity(v); setSpectateStatus('') }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSpectate() }}
+              placeholder={t('tools.spectate.placeholder')}
+            />
+          </div>
+          <SonaButton onClick={handleSpectate} disabled={isSpectating || !spectateIdentity.trim()}>
+            {isSpectating ? t('tools.spectate.launching') : t('tools.spectate.button')}
+          </SonaButton>
+          <SonaButton variant="secondary" onClick={refreshWatchableFriends} disabled={loadingWatchableFriends}>
+            {loadingWatchableFriends ? t('common.loading') : t('tools.spectate.refreshFriends')}
+          </SonaButton>
+        </div>
+
+        {watchableFriends.length > 0 && (
+          <div className="sona-spectate-friends">
+            {watchableFriends.map((friend) => (
+              <button
+                key={friend.puuid}
+                className="sona-spectate-friend"
+                type="button"
+                disabled={isSpectating}
+                onClick={() => launchSpectatorByPuuid(friend.puuid, `${friend.gameName}#${friend.gameTag}`)}
+              >
+                <span className="sona-spectate-friend-name">{friend.gameName}#{friend.gameTag}</span>
+                <span className="sona-spectate-friend-mode">{friend.lol?.gameQueueType || friend.lol?.gameMode || t('common.unknown')}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {spectateStatus && <p className="sona-subtitle" style={{ marginTop: 8 }}>{spectateStatus}</p>}
       </SettingGroup>
 
       <SettingGroup title={t('tools.group.replay')}>

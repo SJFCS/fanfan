@@ -39,6 +39,60 @@
   gap: 8px;
 }
 
+.sona-spectate-friends {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sona-spectate-friend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 260px;
+  min-height: 34px;
+  padding: 7px 10px;
+  background: rgba(30, 35, 40, 0.42);
+  border: 1px solid rgba(200, 170, 110, 0.16);
+  border-radius: 4px;
+  color: #f0e6d2;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.sona-spectate-friend:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(30, 35, 40, 0.62);
+  border-color: rgba(200, 170, 110, 0.38);
+}
+
+.sona-spectate-friend:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.sona-spectate-friend-name,
+.sona-spectate-friend-mode {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sona-spectate-friend-name {
+  color: #f0e6d2;
+  font-size: 12px;
+}
+
+.sona-spectate-friend-mode {
+  flex-shrink: 0;
+  max-width: 92px;
+  color: #c8aa6e;
+  font-size: 11px;
+}
+
 /* ---- 调试输出区 ---- */
 .sona-debug-output {
   margin-top: 20px;

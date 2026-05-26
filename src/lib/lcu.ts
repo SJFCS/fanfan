@@ -73,7 +73,10 @@ async function request<T = unknown>(endpoint: string, options: RequestInit = {})
   })
 
   if (!response.ok) {
-    throw new Error(`[LCU] 请求失败: ${options.method ?? 'GET'} ${url} → ${response.status} ${response.statusText}`)
+    const errorText = await response.text().catch(() => '')
+    throw new Error(
+      `[LCU] 请求失败: ${options.method ?? 'GET'} ${url} → ${response.status} ${response.statusText}${errorText ? `: ${errorText}` : ''}`,
+    )
   }
 
   // 204 No Content 等情况不需要解析 body
@@ -605,6 +608,16 @@ class LCUManager {
       '/lol-spectator/v1/spectate/launch',
       typeof payload === 'string' ? this.createSpectatorLaunchPayload(payload) : payload,
     )
+  }
+
+  /** 检查好友 presence 中的 spectatorKey 当前是否还能观战。 */
+  canSpectateBuddy(puuid: string, spectatorKey: string): Promise<unknown> {
+    return get(`/lol-spectator/v3/buddy/can-spectate/${encodeURIComponent(puuid)}/${encodeURIComponent(spectatorKey)}`)
+  }
+
+  /** 通过新版好友观战接口调起观战。 */
+  spectateBuddy(puuid: string): Promise<unknown> {
+    return post('/lol-spectator/v3/buddy/spectate', [puuid])
   }
 
 
