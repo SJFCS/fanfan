@@ -240,6 +240,41 @@ export interface ChallengePlayerPreferencesPayload {
   challengeIds?: Array<string | number>
 }
 
+type EmoteLoadoutSlot =
+  | 'EMOTES_WHEEL_CENTER'
+  | 'EMOTES_WHEEL_UPPER'
+  | 'EMOTES_WHEEL_RIGHT'
+  | 'EMOTES_WHEEL_UPPER_RIGHT'
+  | 'EMOTES_WHEEL_UPPER_LEFT'
+  | 'EMOTES_WHEEL_LOWER'
+  | 'EMOTES_WHEEL_LEFT'
+  | 'EMOTES_WHEEL_LOWER_RIGHT'
+  | 'EMOTES_WHEEL_LOWER_LEFT'
+  | 'EMOTES_START'
+  | 'EMOTES_FIRST_BLOOD'
+  | 'EMOTES_ACE'
+  | 'EMOTES_VICTORY'
+
+const EMOTE_LOADOUT_SLOTS: EmoteLoadoutSlot[] = [
+  'EMOTES_ACE',
+  'EMOTES_FIRST_BLOOD',
+  'EMOTES_VICTORY',
+  'EMOTES_WHEEL_CENTER',
+  'EMOTES_WHEEL_UPPER',
+  'EMOTES_WHEEL_RIGHT',
+  'EMOTES_WHEEL_UPPER_RIGHT',
+  'EMOTES_WHEEL_UPPER_LEFT',
+  'EMOTES_WHEEL_LOWER',
+  'EMOTES_START',
+  'EMOTES_WHEEL_LEFT',
+  'EMOTES_WHEEL_LOWER_RIGHT',
+  'EMOTES_WHEEL_LOWER_LEFT',
+]
+
+interface AccountScopeLoadout {
+  id: string
+}
+
 function patch<T = unknown>(endpoint: string, body?: unknown): Promise<T> {
   return request<T>(endpoint, {
     method: 'PATCH',
@@ -1266,6 +1301,31 @@ class LCUManager {
   /** 更新挑战身份偏好，例如展示旗帜、挑战 token 等 */
   updateChallengePlayerPreferences(payload: ChallengePlayerPreferencesPayload): Promise<void> {
     return post<void>('/lol-challenges/v1/update-player-preferences', payload)
+  }
+
+  /** 卸下所有展示的挑战勋章，同时保留当前旗帜。 */
+  async removeChallengeTokens(): Promise<void> {
+    const me = await this.getChatMe()
+    await this.updateChallengePlayerPreferences({
+      challengeIds: [],
+      bannerAccent: me.lol?.bannerIdSelected,
+    })
+  }
+
+  /** 卸下表情轮盘和事件回应位上的所有表情。 */
+  async clearEmotes(): Promise<void> {
+    const loadouts = await get<AccountScopeLoadout[]>('/lol-loadouts/v4/loadouts/scope/account')
+    const loadoutId = loadouts[0]?.id
+
+    if (!loadoutId) {
+      throw new Error('[LCU] No account scope loadout found')
+    }
+
+    const loadout = Object.fromEntries(
+      EMOTE_LOADOUT_SLOTS.map((slot) => [slot, { inventoryType: 'EMOTE', itemId: -1 }]),
+    )
+
+    await patch(`/lol-loadouts/v4/loadouts/${encodeURIComponent(loadoutId)}`, { loadout })
   }
 
   /** 应用挑战旗帜 */

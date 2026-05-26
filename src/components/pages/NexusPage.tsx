@@ -23,6 +23,36 @@ export function NexusPage() {
   const [rankQueue, setRankQueue] = useState(store.get('rankQueue'))
   const [rankTier, setRankTier] = useState(store.get('rankTier'))
   const [rankDivision, setRankDivision] = useState(store.get('rankDivision'))
+  const [removingChallengeTokens, setRemovingChallengeTokens] = useState(false)
+  const [clearingEmotes, setClearingEmotes] = useState(false)
+
+  const handleRemoveChallengeTokens = async () => {
+    if (removingChallengeTokens) return
+
+    setRemovingChallengeTokens(true)
+    try {
+      await lcu.removeChallengeTokens()
+      logger.info('挑战勋章已卸下')
+    } catch (err) {
+      logger.error('卸下挑战勋章失败:', err)
+    } finally {
+      setRemovingChallengeTokens(false)
+    }
+  }
+
+  const handleClearEmotes = async () => {
+    if (clearingEmotes) return
+
+    setClearingEmotes(true)
+    try {
+      await lcu.clearEmotes()
+      logger.info('表情已全部卸下')
+    } catch (err) {
+      logger.error('卸下表情失败:', err)
+    } finally {
+      setClearingEmotes(false)
+    }
+  }
 
   useEffect(() => {
     const unsubs = [
@@ -179,6 +209,22 @@ export function NexusPage() {
             }
           }}>
             {t('tools.unequip')}
+          </SonaButton>
+        </SettingCard>
+        <SettingCard
+          title={t('tools.removeChallengeTokens.title')}
+          description={t('tools.removeChallengeTokens.description')}
+        >
+          <SonaButton onClick={handleRemoveChallengeTokens} disabled={removingChallengeTokens}>
+            {removingChallengeTokens ? t('common.loading') : t('tools.unequip')}
+          </SonaButton>
+        </SettingCard>
+        <SettingCard
+          title={t('tools.clearEmotes.title')}
+          description={t('tools.clearEmotes.description')}
+        >
+          <SonaButton onClick={handleClearEmotes} disabled={clearingEmotes}>
+            {clearingEmotes ? t('common.loading') : t('tools.unequip')}
           </SonaButton>
         </SettingCard>
         <SettingCard
