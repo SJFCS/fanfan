@@ -272,7 +272,6 @@ export function CustomPage() {
   const toggleCustomAvatarMode = (enabled: boolean) => {
     if (!enabled) {
       cancelScheduledCustomAvatarSync()
-      setShowAvatarInput(false)
       setIsAvatarDropActive(false)
       setAssetMessage(t('beautify.assets.instructions'))
     } else {
@@ -311,14 +310,14 @@ export function CustomPage() {
   const addHomepageBackgroundInputPath = () => {
     if (addHomepageBackgroundAssetPath(assetPathInput)) {
       setAssetPathInput('')
-      setShowHomepageBackgroundInput(false)
+      setShowHomepageBackgroundInput(true)
     }
   }
 
   const addCustomAvatarInputPath = () => {
     if (addCustomAvatarAssetPath(assetPathInput)) {
       setAssetPathInput('')
-      setShowAvatarInput(false)
+      setShowAvatarInput(true)
     }
   }
 
