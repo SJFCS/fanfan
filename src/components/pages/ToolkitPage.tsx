@@ -28,6 +28,8 @@ export function ToolkitPage() {
   const [updatingConfigLock, setUpdatingConfigLock] = useState(false)
   const [locked, setLocked] = useState(store.get('gameConfigLocked'))
   const [configDetailsOpen, setConfigDetailsOpen] = useState(false)
+  const [restartingUx, setRestartingUx] = useState(false)
+  const [restartUxError, setRestartUxError] = useState('')
 
   const handleSearchMatch = async () => {
     const parts = searchRiotId.trim().split('#')
@@ -102,6 +104,21 @@ export function ToolkitPage() {
     }
   }
 
+  const handleRestartUx = async () => {
+    setRestartingUx(true)
+    setRestartUxError('')
+
+    try {
+      await lcu.restartUx()
+      logger.info('[Toolkit] League Client UX restart requested')
+    } catch (err) {
+      logger.error('[Toolkit] Failed to restart League Client UX:', err)
+      setRestartUxError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setRestartingUx(false)
+    }
+  }
+
   return (
     <div className="sona-settings">
       <h2 className="sona-settings-title">{t('tools.title')}</h2>
@@ -130,6 +147,25 @@ export function ToolkitPage() {
         puuid={matchModalPuuid}
         playerName={matchModalName}
       />
+
+      <SettingGroup title={t('tools.group.client')}>
+        <div className="sona-config-lock-card">
+          <SettingCard
+            title={t('tools.restartUx.title')}
+            description={t('tools.restartUx.description')}
+          >
+            <SonaButton variant="secondary" onClick={handleRestartUx} disabled={restartingUx}>
+              {restartingUx ? t('tools.restartUx.restarting') : t('tools.restartUx.button')}
+            </SonaButton>
+          </SettingCard>
+
+          {restartUxError && (
+            <div className="sona-config-action-error">
+              {t('tools.restartUx.failed', { error: restartUxError })}
+            </div>
+          )}
+        </div>
+      </SettingGroup>
 
       <SettingGroup title={t('tools.group.replay')}>
         <p className="sona-subtitle" style={{ marginBottom: 10 }}>{t('tools.replay.description')}</p>

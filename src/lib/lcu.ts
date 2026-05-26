@@ -487,6 +487,13 @@ class LCUManager {
   patch = patch
   delete = del
 
+  // ==================== Riot Client ====================
+
+  /** Restart League Client UX without closing the launcher/game session. */
+  restartUx(): Promise<unknown> {
+    return post('/riotclient/kill-and-restart-ux')
+  }
+
   // ==================== 召唤师 ====================
 
   /** 获取当前登录的召唤师信息 */
