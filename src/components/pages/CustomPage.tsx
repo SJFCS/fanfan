@@ -18,6 +18,7 @@ const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'ogg', 'ogv', 'mov', 'm4v'])
 const DRAG_SCROLL_EDGE_SIZE = 76
 const DRAG_SCROLL_MAX_SPEED = 20
 const DEFAULT_WALLPAPER_ADJUSTMENT = { scale: 1, offsetX: 0, offsetY: 0 }
+const WALLPAPER_FRAME_ASPECT_RATIO = 16 / 9
 const WALLPAPER_SCALE_MIN = 1
 const WALLPAPER_SCALE_MAX = 3
 const WALLPAPER_WHEEL_SCALE_STEP = 0.08
@@ -38,6 +39,11 @@ interface WallpaperDragStart {
   clientY: number
   offsetX: number
   offsetY: number
+}
+
+interface WallpaperMediaSize {
+  width: number
+  height: number
 }
 
 interface AvatarAdjustment {
@@ -99,12 +105,12 @@ function getVideoPosterAssetPath(assetPath: string): string {
   return assetPath.replace(/\.[^.\\/]+$/, '.png')
 }
 
-function getWallpaperBackgroundSize(adjustment: WallpaperAdjustment): string {
-  return adjustment.scale === 1 ? 'cover' : `${Number((adjustment.scale * 100).toFixed(2))}% auto`
+function getWallpaperPreviewLeft(adjustment: WallpaperAdjustment): string {
+  return `calc(50% + ${Number(adjustment.offsetX.toFixed(2))}%)`
 }
 
-function getWallpaperBackgroundPosition(adjustment: WallpaperAdjustment): string {
-  return `calc(50% + ${Number(adjustment.offsetX.toFixed(2))}%) calc(50% + ${Number(adjustment.offsetY.toFixed(2))}%)`
+function getWallpaperPreviewTop(adjustment: WallpaperAdjustment): string {
+  return `calc(50% + ${Number(adjustment.offsetY.toFixed(2))}%)`
 }
 
 function getAvatarPreviewLeft(adjustment: AvatarAdjustment): string {
@@ -117,6 +123,39 @@ function getAvatarPreviewTop(adjustment: AvatarAdjustment): string {
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
+}
+
+function getWallpaperOffsetLimit(
+  frameSize: { width: number; height: number } | undefined,
+  mediaSize: WallpaperMediaSize | undefined,
+  scale: number,
+) {
+  if (!frameSize?.width || !frameSize.height || !mediaSize?.width || !mediaSize.height) {
+    return { maxOffsetX: 100, maxOffsetY: 100 }
+  }
+
+  const frameRatio = frameSize.width / frameSize.height
+  const mediaRatio = mediaSize.width / mediaSize.height
+  const coverWidthRatio = (mediaRatio >= frameRatio ? mediaRatio / frameRatio : 1) * scale
+  const coverHeightRatio = (mediaRatio >= frameRatio ? 1 : frameRatio / mediaRatio) * scale
+
+  return {
+    maxOffsetX: Math.max(0, ((coverWidthRatio - 1) / 2) * 100),
+    maxOffsetY: Math.max(0, ((coverHeightRatio - 1) / 2) * 100),
+  }
+}
+
+function clampWallpaperAdjustment(
+  adjustment: WallpaperAdjustment,
+  frameSize: { width: number; height: number } | undefined,
+  mediaSize: WallpaperMediaSize | undefined,
+): WallpaperAdjustment {
+  const { maxOffsetX, maxOffsetY } = getWallpaperOffsetLimit(frameSize, mediaSize, adjustment.scale)
+  return {
+    ...adjustment,
+    offsetX: clampNumber(adjustment.offsetX, -maxOffsetX, maxOffsetX),
+    offsetY: clampNumber(adjustment.offsetY, -maxOffsetY, maxOffsetY),
+  }
 }
 
 function getAvatarOffsetLimit(size: { width: number; height: number } | undefined, scale: number) {
@@ -173,6 +212,7 @@ export function CustomPage() {
   const [customAvatarActiveAssetPath, setCustomAvatarActiveAssetPath] = useState(() => store.get('customAvatarActiveAssetPath'))
   const [customAvatarAdjustments, setCustomAvatarAdjustments] = useState(() => store.get('customAvatarAdjustments'))
   const [avatarImageSizes, setAvatarImageSizes] = useState<Record<string, { width: number; height: number }>>({})
+  const [wallpaperMediaSizes, setWallpaperMediaSizes] = useState<Record<string, WallpaperMediaSize>>({})
   const [assetMessage, setAssetMessage] = useState(() => t('beautify.assets.instructions'))
   const [editingWallpaperAssetPath, setEditingWallpaperAssetPath] = useState<string | null>(null)
   const [editingAvatarAssetPath, setEditingAvatarAssetPath] = useState<string | null>(null)
@@ -372,7 +412,11 @@ export function CustomPage() {
 
   const openHomepageBackgroundAdjustModal = (assetPath: string) => {
     setEditingWallpaperAssetPath(assetPath)
-    setDraftWallpaperAdjustment(homepageBackgroundAdjustments[assetPath] ?? DEFAULT_WALLPAPER_ADJUSTMENT)
+    setDraftWallpaperAdjustment(clampWallpaperAdjustment(
+      homepageBackgroundAdjustments[assetPath] ?? DEFAULT_WALLPAPER_ADJUSTMENT,
+      wallpaperFrameRef.current?.getBoundingClientRect(),
+      wallpaperMediaSizes[assetPath],
+    ))
     wallpaperDragStartRef.current = null
   }
 
@@ -384,9 +428,12 @@ export function CustomPage() {
   const saveHomepageBackgroundAdjustment = () => {
     if (!editingWallpaperAssetPath) return
 
+    const frameSize = wallpaperFrameRef.current?.getBoundingClientRect()
+    const size = wallpaperMediaSizes[editingWallpaperAssetPath]
+    const nextAdjustment = clampWallpaperAdjustment(draftWallpaperAdjustment, frameSize, size)
     const nextAdjustments = {
       ...homepageBackgroundAdjustments,
-      [editingWallpaperAssetPath]: draftWallpaperAdjustment,
+      [editingWallpaperAssetPath]: nextAdjustment,
     }
     saveHomepageBackgroundAdjustments(nextAdjustments)
     setAssetMessage(t('beautify.status.wallpaperSaved', { path: editingWallpaperAssetPath }))
@@ -395,6 +442,26 @@ export function CustomPage() {
 
   const resetHomepageBackgroundAdjustment = () => {
     setDraftWallpaperAdjustment(DEFAULT_WALLPAPER_ADJUSTMENT)
+  }
+
+  const updateWallpaperMediaSize = (assetPath: string, width: number, height: number) => {
+    if (!width || !height) return
+
+    const nextSize = { width, height }
+    setWallpaperMediaSizes((current) => {
+      const currentSize = current[assetPath]
+      if (currentSize?.width === width && currentSize.height === height) return current
+      return {
+        ...current,
+        [assetPath]: nextSize,
+      }
+    })
+
+    if (editingWallpaperAssetPath === assetPath) {
+      setDraftWallpaperAdjustment((current) =>
+        clampWallpaperAdjustment(current, wallpaperFrameRef.current?.getBoundingClientRect(), nextSize)
+      )
+    }
   }
 
   const openCustomAvatarAdjustModal = (assetPath: string) => {
@@ -462,6 +529,25 @@ export function CustomPage() {
     }
   }
 
+  const getWallpaperPreviewStageStyle = (assetPath: string, adjustment: WallpaperAdjustment) => {
+    const size = wallpaperMediaSizes[assetPath]
+    const aspectRatio = size ? size.width / size.height : WALLPAPER_FRAME_ASPECT_RATIO
+    const isWiderThanFrame = aspectRatio >= WALLPAPER_FRAME_ASPECT_RATIO
+    const scale = adjustment.scale
+
+    return {
+      left: getWallpaperPreviewLeft(adjustment),
+      top: getWallpaperPreviewTop(adjustment),
+      width: isWiderThanFrame
+        ? `${Number(((aspectRatio / WALLPAPER_FRAME_ASPECT_RATIO) * 100 * scale).toFixed(4))}%`
+        : `${Number((100 * scale).toFixed(4))}%`,
+      height: isWiderThanFrame
+        ? `${Number((100 * scale).toFixed(4))}%`
+        : `${Number(((WALLPAPER_FRAME_ASPECT_RATIO / aspectRatio) * 100 * scale).toFixed(4))}%`,
+      transform: 'translate(-50%, -50%)',
+    }
+  }
+
   const handleWallpaperFramePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -476,16 +562,18 @@ export function CustomPage() {
   const handleWallpaperFramePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const dragStart = wallpaperDragStartRef.current
     const frame = wallpaperFrameRef.current
-    if (!dragStart || !frame) return
+    if (!dragStart || !frame || !editingWallpaperAssetPath) return
 
     const rect = frame.getBoundingClientRect()
-    const offsetX = dragStart.offsetX - ((event.clientX - dragStart.clientX) / rect.width) * 100
-    const offsetY = dragStart.offsetY - ((event.clientY - dragStart.clientY) / rect.height) * 100
+    const offsetX = dragStart.offsetX + ((event.clientX - dragStart.clientX) / rect.width) * 100
+    const offsetY = dragStart.offsetY + ((event.clientY - dragStart.clientY) / rect.height) * 100
+    const size = wallpaperMediaSizes[editingWallpaperAssetPath]
+    const { maxOffsetX, maxOffsetY } = getWallpaperOffsetLimit(rect, size, draftWallpaperAdjustment.scale)
 
     setDraftWallpaperAdjustment((current) => ({
       ...current,
-      offsetX: clampNumber(offsetX, -100, 100),
-      offsetY: clampNumber(offsetY, -100, 100),
+      offsetX: clampNumber(offsetX, -maxOffsetX, maxOffsetX),
+      offsetY: clampNumber(offsetY, -maxOffsetY, maxOffsetY),
     }))
   }
 
@@ -499,10 +587,20 @@ export function CustomPage() {
   const handleWallpaperFrameWheel = (event: WheelEvent<HTMLDivElement>) => {
     event.preventDefault()
     const direction = event.deltaY < 0 ? 1 : -1
-    setDraftWallpaperAdjustment((current) => ({
-      ...current,
-      scale: Number(clampNumber(current.scale + direction * WALLPAPER_WHEEL_SCALE_STEP, WALLPAPER_SCALE_MIN, WALLPAPER_SCALE_MAX).toFixed(2)),
-    }))
+    if (!editingWallpaperAssetPath) return
+
+    const size = wallpaperMediaSizes[editingWallpaperAssetPath]
+    const frameSize = wallpaperFrameRef.current?.getBoundingClientRect()
+    setDraftWallpaperAdjustment((current) =>
+      clampWallpaperAdjustment(
+        {
+          ...current,
+          scale: Number(clampNumber(current.scale + direction * WALLPAPER_WHEEL_SCALE_STEP, WALLPAPER_SCALE_MIN, WALLPAPER_SCALE_MAX).toFixed(2)),
+        },
+        frameSize,
+        size,
+      )
+    )
   }
 
   const handleAvatarFramePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -1260,27 +1358,40 @@ export function CustomPage() {
                 onPointerUp={handleWallpaperFramePointerEnd}
                 onPointerCancel={handleWallpaperFramePointerEnd}
                 onWheel={handleWallpaperFrameWheel}
-                style={isVideoFile(editingWallpaperAssetPath)
-                  ? undefined
-                  : {
-                      backgroundImage: `url("${getAssetUrl(editingWallpaperAssetPath)}")`,
-                      backgroundSize: getWallpaperBackgroundSize(draftWallpaperAdjustment),
-                      backgroundPosition: getWallpaperBackgroundPosition(draftWallpaperAdjustment),
-                      backgroundRepeat: 'no-repeat',
-                    }}
               >
-                {isVideoFile(editingWallpaperAssetPath) && (
-                  <video
-                    src={getAssetUrl(editingWallpaperAssetPath)}
-                    muted
-                    loop
-                    autoPlay
-                    playsInline
-                    style={{
-                      transform: `translate(${draftWallpaperAdjustment.offsetX}%, ${draftWallpaperAdjustment.offsetY}%) scale(${draftWallpaperAdjustment.scale})`,
-                    }}
-                  />
-                )}
+                <div
+                  className="sona-wallpaper-preview-stage"
+                  style={getWallpaperPreviewStageStyle(editingWallpaperAssetPath, draftWallpaperAdjustment)}
+                >
+                  {isVideoFile(editingWallpaperAssetPath) ? (
+                    <video
+                      src={getAssetUrl(editingWallpaperAssetPath)}
+                      muted
+                      loop
+                      autoPlay
+                      playsInline
+                      onLoadedMetadata={(event) =>
+                        updateWallpaperMediaSize(
+                          editingWallpaperAssetPath,
+                          event.currentTarget.videoWidth,
+                          event.currentTarget.videoHeight,
+                        )
+                      }
+                    />
+                  ) : (
+                    <img
+                      src={getAssetUrl(editingWallpaperAssetPath)}
+                      alt={editingWallpaperAssetPath}
+                      onLoad={(event) =>
+                        updateWallpaperMediaSize(
+                          editingWallpaperAssetPath,
+                          event.currentTarget.naturalWidth,
+                          event.currentTarget.naturalHeight,
+                        )
+                      }
+                    />
+                  )}
+                </div>
                 <div className="sona-wallpaper-adjust-frame-guide" />
               </div>
 
