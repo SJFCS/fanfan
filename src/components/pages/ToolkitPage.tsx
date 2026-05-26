@@ -9,6 +9,7 @@ import { logger } from '@/index'
 import { store } from '@/lib/store'
 import { useI18n } from '@/i18n'
 import '@/styles/SettingsPage.css'
+import '@/styles/ConfigLockPage.css'
 
 
 export function ToolkitPage() {
@@ -20,6 +21,13 @@ export function ToolkitPage() {
   const [matchModalOpen, setMatchModalOpen] = useState(false)
   const [matchModalPuuid, setMatchModalPuuid] = useState('')
   const [matchModalName, setMatchModalName] = useState('')
+  const [settingsPath, setSettingsPath] = useState('')
+  const [loadingConfigPath, setLoadingConfigPath] = useState(false)
+  const [configPathError, setConfigPathError] = useState('')
+  const [configActionError, setConfigActionError] = useState('')
+  const [updatingConfigLock, setUpdatingConfigLock] = useState(false)
+  const [locked, setLocked] = useState(store.get('gameConfigLocked'))
+  const [configDetailsOpen, setConfigDetailsOpen] = useState(false)
 
   const handleSearchMatch = async () => {
     const parts = searchRiotId.trim().split('#')
@@ -39,6 +47,58 @@ export function ToolkitPage() {
       setMatchModalOpen(true)
     } catch {
       setSearchError(t('tools.matchQuery.failed'))
+    }
+  }
+
+  const refreshConfigPath = async () => {
+    setLoadingConfigPath(true)
+    setConfigPathError('')
+    try {
+      setSettingsPath(await lcu.getGameSettingsFilePath())
+    } catch (err) {
+      setSettingsPath('')
+      setConfigPathError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoadingConfigPath(false)
+    }
+  }
+
+  useEffect(() => {
+    return store.onChange('gameConfigLocked', setLocked)
+  }, [])
+
+  const toggleConfigDetails = () => {
+    setConfigDetailsOpen((open) => {
+      const next = !open
+      if (next && !settingsPath && !configPathError && !loadingConfigPath) {
+        void refreshConfigPath()
+      }
+      return next
+    })
+  }
+
+  const toggleConfigLocked = async () => {
+    if (!Pengu.gameConfig) {
+      setConfigActionError('当前 Pengu Loader 不支持配置只读接口，请先更新到支持 gameConfig 的版本。')
+      return
+    }
+
+    const next = !locked
+    setUpdatingConfigLock(true)
+    setConfigActionError('')
+
+    try {
+      if (next) {
+        await Pengu.gameConfig.lock()
+      } else {
+        await Pengu.gameConfig.unlock()
+      }
+      setLocked(next)
+      store.set('gameConfigLocked', next)
+    } catch (err) {
+      setConfigActionError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setUpdatingConfigLock(false)
     }
   }
 
@@ -153,6 +213,43 @@ export function ToolkitPage() {
           </SonaButton>
         </div>
       </SettingGroup>
+
+      <div className="sona-config-lock-card">
+        <SettingCard
+          title={t('tools.group.configLock')}
+          description={t('tools.group.configLock.description')}
+        >
+          <SonaButton variant="secondary" onClick={toggleConfigDetails}>
+            {configDetailsOpen ? '收起' : '详情'}
+          </SonaButton>
+          <SonaButton variant={locked ? 'secondary' : 'primary'} onClick={toggleConfigLocked} disabled={updatingConfigLock}>
+            {updatingConfigLock ? '处理中...' : locked ? '解锁配置' : '锁定配置'}
+          </SonaButton>
+        </SettingCard>
+
+        {configDetailsOpen && (
+          <div className="sona-config-path-panel sona-config-path-panel--nested">
+            <div className="sona-config-path-header">
+              <div>
+                <div className="sona-config-path-label">配置文件地址</div>
+                <p>当前客户端的 PersistedSettings.json 路径。路径通过 LCU 的 /data-store/v1/install-dir 推导。</p>
+              </div>
+              <SonaButton variant="secondary" onClick={refreshConfigPath} disabled={loadingConfigPath}>
+                刷新
+              </SonaButton>
+            </div>
+            <div className={`sona-config-path-value${configPathError ? ' sona-config-path-value--error' : ''}`}>
+              {loadingConfigPath ? '正在请求客户端安装目录' : configPathError || settingsPath || '暂无路径'}
+            </div>
+          </div>
+        )}
+
+        {configActionError && (
+          <div className="sona-config-action-error">
+            {configActionError}
+          </div>
+        )}
+      </div>
 
     </div>
   )

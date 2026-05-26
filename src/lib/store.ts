@@ -37,6 +37,7 @@ export interface SonaConfig {
   unlockAvailability: boolean
   /** Try to keep offline status when the client automatically changes it to away/chat. */
   lockOfflineStatus: boolean
+  gameConfigLocked: boolean
   /** 大乱斗无CD换英雄 */
   benchNoCooldown: boolean
   /** 侧边栏收缩状态 */
@@ -213,6 +214,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   unlockStatus: true,
   unlockAvailability: false,
   lockOfflineStatus: false,
+  gameConfigLocked: false,
   benchNoCooldown: false,
   sidebarCollapsed: false,
   availability: 'chat',

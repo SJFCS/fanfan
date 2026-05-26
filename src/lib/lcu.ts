@@ -308,6 +308,27 @@ const TENCENT_PLATFORM_IDS = new Set([
   'PBE', 'PREPBE',
 ])
 
+function joinWindowsPath(...parts: string[]): string {
+  return parts
+    .filter(Boolean)
+    .join('\\')
+    .replace(/[\\/]+/g, '\\')
+}
+
+function dirnameWindowsPath(value: string): string {
+  const normalized = value.replace(/[\\/]+$/g, '')
+  const index = Math.max(normalized.lastIndexOf('\\'), normalized.lastIndexOf('/'))
+  return index > 0 ? normalized.slice(0, index) : normalized
+}
+
+function isTencentRegionLocale(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const regionLocale = value as Record<string, unknown>
+  return Object.values(regionLocale).some(
+    (item) => typeof item === 'string' && item.toUpperCase() === 'TENCENT',
+  )
+}
+
 // ==================== LCUManager 类 ====================
 
 type EventCallback = (message: LCUEventMessage) => void
@@ -1196,6 +1217,34 @@ class LCUManager {
 
   getMissions(): Promise<Mission[]> {
     return get<Mission[]>('/lol-missions/v1/missions')
+  }
+
+  async getGameSettingsFilePath(): Promise<string> {
+    const installDir = await get<string>('/data-store/v1/install-dir')
+    let platformId = ''
+    let isTencentClient = false
+
+    try {
+      const me = await this.getChatMe()
+      platformId = me.platformId?.toUpperCase() ?? ''
+      isTencentClient = TENCENT_PLATFORM_IDS.has(platformId) && platformId !== 'PBE' && platformId !== 'PREPBE'
+    } catch {
+      platformId = ''
+    }
+
+    if (!isTencentClient) {
+      try {
+        isTencentClient = isTencentRegionLocale(await get<unknown>('/riotclient/region-locale'))
+      } catch {
+        isTencentClient = false
+      }
+    }
+
+    const configDir = isTencentClient
+      ? joinWindowsPath(dirnameWindowsPath(installDir), 'Game', 'Config')
+      : joinWindowsPath(installDir, 'Config')
+
+    return joinWindowsPath(configDir, 'PersistedSettings.json')
   }
 
   selectMissionRewardGroups(missionId: string, rewardGroups: string[]): Promise<void> {

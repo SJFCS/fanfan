@@ -61,10 +61,10 @@ function PageContent({ pageId }: { pageId: string }) {
       return <AutoClaimPage />
     case 'nexus':
       return <NexusPage />
-    case 'custom':
-      return <CustomPage />
     case 'toolkit':
       return <ToolkitPage />         
+    case 'custom':
+      return <CustomPage />
     case 'options':
       return <OptionsPage />
     case 'tools':

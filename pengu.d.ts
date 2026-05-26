@@ -67,6 +67,12 @@ declare global {
   const Pengu: {
     /** Current Pengu Loader version */
     version: string
+    /** Narrow helper for League PersistedSettings.json file attributes. */
+    gameConfig?: {
+      setReadonly(readonly: boolean): Promise<void>
+      lock(): Promise<void>
+      unlock(): Promise<void>
+    }
   }
 
   /** Toast notification API @since v1.1.0 */
