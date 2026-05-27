@@ -126,7 +126,8 @@ export function OpggBuildRecommendationPanel({
   const queueText = recommendation?.modeLabel || (context.queueId > 0 ? getQueueName(context.queueId) : t('opgg.unknownQueue'))
   const positionText = recommendation?.position ?? context.position
   const modeTags = [queueText, formatPositionText(positionText)].filter(Boolean).join(' · ')
-  const showAugments = isKiwiMode(context) || recommendation?.mode === 'arena'
+  const isKiwi = isKiwiMode(context)
+  const showAugments = isKiwi || recommendation?.mode === 'arena'
 
   return (
     <div className="sobp">
@@ -155,20 +156,33 @@ export function OpggBuildRecommendationPanel({
         </div>
       </header>
 
-      <main className="sobp-body">
-        <div className="sobp-grid">
-          <ItemSection title={t('opgg.section.core')} builds={recommendation?.coreItems} itemLimit={3} />
-          <RuneSection title={t('opgg.section.runes')} runes={recommendation?.runePages} championName={championName} modeLabel={recommendation?.modeLabel || queueText} />
-          <SpellSection title={t('opgg.section.spells')} builds={recommendation?.summonerSpells} limit={MAX_RECOMMENDATION_ROWS} />
-        </div>
+      <main className={`sobp-body${isKiwi ? ' sobp-body--kiwi' : ''}`}>
+        {isKiwi ? (
+          <div className="sobp-kiwi-layout">
+            <div className="sobp-kiwi-trend">
+              <LastItemTrendSection title={t('opgg.section.trends')} builds={recommendation?.lastItems} />
+            </div>
+            <div className="sobp-kiwi-augments">
+              {showAugments && <AugmentSection title={t('opgg.section.augments')} groups={recommendation?.augments} winRateFirst />}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="sobp-grid">
+              <ItemSection title={t('opgg.section.core')} builds={recommendation?.coreItems} itemLimit={3} />
+              <RuneSection title={t('opgg.section.runes')} runes={recommendation?.runePages} championName={championName} modeLabel={recommendation?.modeLabel || queueText} />
+              <SpellSection title={t('opgg.section.spells')} builds={recommendation?.summonerSpells} limit={MAX_RECOMMENDATION_ROWS} />
+            </div>
 
-        <div className="sobp-trend-wrap">
-          <LastItemTrendSection title={t('opgg.section.trends')} builds={recommendation?.lastItems} />
-        </div>
+            <div className="sobp-trend-wrap">
+              <LastItemTrendSection title={t('opgg.section.trends')} builds={recommendation?.lastItems} />
+            </div>
 
-        <MatchupSection title={t('opgg.section.matchups')} matchups={recommendation?.matchups} />
+            <MatchupSection title={t('opgg.section.matchups')} matchups={recommendation?.matchups} />
 
-        {showAugments && <AugmentSection title={t('opgg.section.augments')} groups={recommendation?.augments} winRateFirst={isKiwiMode(context)} />}
+            {showAugments && <AugmentSection title={t('opgg.section.augments')} groups={recommendation?.augments} winRateFirst={isKiwi} />}
+          </>
+        )}
 
         {isLoading && <PanelMessage>{t('opgg.loading')}</PanelMessage>}
         {loadError && <PanelMessage warning>{t('opgg.loadFailed', { error: loadError })}</PanelMessage>}
