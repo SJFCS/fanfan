@@ -36,6 +36,15 @@ interface LobbyMemberStats {
   total: number
 }
 
+function createEmptyLobbyMemberStats(): LobbyMemberStats {
+  return {
+    winRate: 0,
+    kda: 0,
+    score: null,
+    total: 0,
+  }
+}
+
 interface BoundIdentity {
   element: HTMLElement
   previousPosition: string
@@ -165,7 +174,10 @@ async function doRefreshLobbyMemberStats() {
         deaths += participant.deaths
       }
 
-      if (total === 0) return
+      if (total === 0) {
+        nextStats.set(member.puuid, createEmptyLobbyMemberStats())
+        return
+      }
 
       const strengthScore = calculateSonaPlayerStrengthScore(games, member.puuid)
       nextStats.set(member.puuid, {
@@ -176,6 +188,7 @@ async function doRefreshLobbyMemberStats() {
       })
     } catch (err) {
       logger.debug('[LobbyHistory] 拉取成员战绩失败: %s', member.name, err)
+      nextStats.set(member.puuid, createEmptyLobbyMemberStats())
     }
   }))
 
@@ -268,11 +281,13 @@ function ensureStatsOverlay(identity: HTMLElement): HTMLDivElement {
 function renderStatsOverlay(identity: HTMLElement, stats: LobbyMemberStats | undefined) {
   const overlay = ensureStatsOverlay(identity)
   const nextText = stats
-    ? [
+    ? stats.total > 0
+      ? [
         `胜率 ${Math.round(stats.winRate * 100)}%`,
         `KDA ${stats.kda >= 99 ? 'Perfect' : stats.kda.toFixed(2)}`,
         `评分 ${stats.score != null ? stats.score.toFixed(1) : '--'}`,
       ].join('|')
+      : '萌新上线|暂无数据'
     : '战绩加载中...'
 
   if (overlay.getAttribute(SONA_LOBBY_STATS_TEXT_ATTR) === nextText) {
@@ -282,6 +297,15 @@ function renderStatsOverlay(identity: HTMLElement, stats: LobbyMemberStats | und
 
   if (!stats) {
     overlay.innerHTML = '<span style="color:#a09b8c">战绩加载中...</span>'
+    return
+  }
+
+  if (stats.total === 0) {
+    overlay.innerHTML = [
+      '<span style="color:#c8aa6e">🆕 萌新上线</span>',
+      '<span style="color:#5c5b57">|</span>',
+      '<span style="color:#a09b8c">暂无数据</span>',
+    ].join('')
     return
   }
 
