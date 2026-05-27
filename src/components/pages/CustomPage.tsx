@@ -1376,11 +1376,13 @@ export function CustomPage() {
                 >
                   {isVideoFile(editingWallpaperAssetPath) ? (
                     <video
+                      key={`wallpaper-video-${editingWallpaperAssetPath}`}
                       src={getAssetUrl(editingWallpaperAssetPath, 'wallpapers')}
                       muted
                       loop
                       autoPlay
                       playsInline
+                      preload="auto"
                       onLoadedMetadata={(event) =>
                         updateWallpaperMediaSize(
                           editingWallpaperAssetPath,
@@ -1391,6 +1393,7 @@ export function CustomPage() {
                     />
                   ) : (
                     <img
+                      key={`wallpaper-image-${editingWallpaperAssetPath}`}
                       src={getAssetUrl(editingWallpaperAssetPath, 'wallpapers')}
                       alt={editingWallpaperAssetPath}
                       onLoad={(event) =>
