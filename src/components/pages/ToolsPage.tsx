@@ -180,6 +180,14 @@ export function ToolsPage() {
   const [showChampSuggestions, setShowChampSuggestions] = useState(false)
   const [autoLockInstant, setAutoLockInstant] = useState(store.get('autoLockInstant'))
   const champSuggestRef = useRef<HTMLDivElement>(null)
+  const [hextechAramAutoLock, setHextechAramAutoLock] = useState(store.get('hextechAramAutoLock'))
+  const [hextechAramAutoLockChampionIds, setHextechAramAutoLockChampionIds] = useState(
+    store.get('hextechAramAutoLockChampionIds'),
+  )
+  const [hextechChampSearchText, setHextechChampSearchText] = useState('')
+  const [hextechChampSuggestions, setHextechChampSuggestions] = useState<ChampionInfo[]>([])
+  const [showHextechChampSuggestions, setShowHextechChampSuggestions] = useState(false)
+  const hextechChampSuggestRef = useRef<HTMLDivElement>(null)
   const [autoBanChampion, setAutoBanChampion] = useState(store.get('autoBanChampion'))
   const [autoBanChampionIds, setAutoBanChampionIds] = useState(store.get('autoBanChampionIds'))
   const [banChampSearchText, setBanChampSearchText] = useState('')
@@ -245,6 +253,8 @@ export function ToolsPage() {
       store.onChange('autoHonor', setAutoHonor),
       store.onChange('autoLockChampion', setAutoLockChampion),
       store.onChange('autoLockChampionIds', setAutoLockChampionIds),
+      store.onChange('hextechAramAutoLock', setHextechAramAutoLock),
+      store.onChange('hextechAramAutoLockChampionIds', setHextechAramAutoLockChampionIds),
       store.onChange('autoBanChampion', setAutoBanChampion),
       store.onChange('autoBanChampionIds', setAutoBanChampionIds),
       store.onChange('rankQueue', setRankQueue),
@@ -259,6 +269,9 @@ export function ToolsPage() {
     const handler = (e: MouseEvent) => {
       if (champSuggestRef.current && !champSuggestRef.current.contains(e.target as Node)) {
         setShowChampSuggestions(false)
+      }
+      if (hextechChampSuggestRef.current && !hextechChampSuggestRef.current.contains(e.target as Node)) {
+        setShowHextechChampSuggestions(false)
       }
       if (banChampSuggestRef.current && !banChampSuggestRef.current.contains(e.target as Node)) {
         setShowBanChampSuggestions(false)
@@ -321,6 +334,27 @@ export function ToolsPage() {
     const next = autoLockChampionIds.filter((id) => id !== championId)
     setAutoLockChampionIds(next)
     store.set('autoLockChampionIds', next)
+  }
+
+  const addHextechAramAutoLockChampion = (champion: ChampionInfo) => {
+    if (hextechAramAutoLockChampionIds.includes(champion.id)) {
+      setHextechChampSearchText('')
+      setShowHextechChampSuggestions(false)
+      return
+    }
+
+    const next = [...hextechAramAutoLockChampionIds, champion.id]
+    setHextechAramAutoLockChampionIds(next)
+    store.set('hextechAramAutoLockChampionIds', next)
+    setHextechChampSearchText('')
+    setShowHextechChampSuggestions(false)
+    logger.info('[HextechAramAutoLock] 宸插姞鍏ョ洰鏍囪嫳闆勯槦鍒? %s %s (ID: %d)', champion.title, champion.name, champion.id)
+  }
+
+  const removeHextechAramAutoLockChampion = (championId: number) => {
+    const next = hextechAramAutoLockChampionIds.filter((id) => id !== championId)
+    setHextechAramAutoLockChampionIds(next)
+    store.set('hextechAramAutoLockChampionIds', next)
   }
 
   const addAutoBanChampion = (champion: ChampionInfo) => {
@@ -621,6 +655,54 @@ export function ToolsPage() {
               championIds={autoLockChampionIds}
               emptyText={t('tools.autoLock.empty')}
               onRemove={removeAutoLockChampion}
+            />
+          </div>
+        )}
+        <SettingCard
+          title={t('tools.hextechAramAutoLock.title')}
+          description={t('tools.hextechAramAutoLock.description')}
+        >
+          <SonaSwitch
+            checked={hextechAramAutoLock}
+            onChange={(v) => { setHextechAramAutoLock(v); store.set('hextechAramAutoLock', v) }}
+          />
+        </SettingCard>
+        {hextechAramAutoLock && (
+          <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="sona-debug-actions" style={{ alignItems: 'flex-start', gap: 8 }}>
+              <div style={{ flex: 1, position: 'relative' }} ref={hextechChampSuggestRef}>
+                <SonaInput
+                  value={hextechChampSearchText}
+                  onChange={(v) => {
+                    setHextechChampSearchText(v)
+                    const results = searchChampions(v)
+                    setHextechChampSuggestions(results)
+                    setShowHextechChampSuggestions(results.length > 0)
+                  }}
+                  placeholder={t('tools.hextechAramAutoLock.searchPlaceholder')}
+                />
+                {showHextechChampSuggestions && hextechChampSuggestions.length > 0 && (
+                  <div className="sona-champ-suggest">
+                    {hextechChampSuggestions.map((c) => (
+                      <button
+                        key={c.id}
+                        className="sona-champ-suggest-item"
+                        type="button"
+                        onClick={() => addHextechAramAutoLockChampion(c)}
+                      >
+                        <img className="sona-champ-suggest-icon" src={`/lol-game-data/assets/v1/champion-icons/${c.id}.png`} alt="" />
+                        <span className="sona-champ-suggest-title">{c.title}</span>
+                        <span className="sona-champ-suggest-name">{c.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <ChampionPriorityCards
+              championIds={hextechAramAutoLockChampionIds}
+              emptyText={t('tools.hextechAramAutoLock.empty')}
+              onRemove={removeHextechAramAutoLockChampion}
             />
           </div>
         )}

@@ -189,6 +189,10 @@ export interface SonaConfig {
   autoLockChampionIds: number[]
   /** 秒抢时是否直接锁定（false 则只选择不锁定） */
   autoLockInstant: boolean
+  /** 海克斯大乱斗秒抢英雄 */
+  hextechAramAutoLock: boolean
+  /** 海克斯大乱斗秒抢目标英雄优先级队列 */
+  hextechAramAutoLockChampionIds: number[]
   /** 自动禁用英雄开关 */
   autoBanChampion: boolean
   /** 自动禁用目标英雄优先级队列 */
@@ -280,6 +284,8 @@ const DEFAULT_CONFIG: SonaConfig = {
   autoLockChampion: false,
   autoLockChampionIds: [],
   autoLockInstant: true,
+  hextechAramAutoLock: false,
+  hextechAramAutoLockChampionIds: [],
   autoBanChampion: false,
   autoBanChampionIds: [],
   balanceBuffTooltip: false,

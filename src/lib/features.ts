@@ -24,6 +24,7 @@ import { updateFriendMatchHistory } from '@/lib/features/friend-match-history'
 import { updateLobbyMemberMatchHistory } from '@/lib/features/lobby-member-match-history'
 import { updateAutoHonor } from '@/lib/features/auto-honor'
 import { updateAutoLockChampion } from '@/lib/features/auto-lock-champion'
+import { updateHextechAramAutoLock } from '@/lib/features/hextech-aram-auto-lock'
 import { updateAutoBanChampion } from '@/lib/features/auto-ban-champion'
 import { applyRankDisguise, updateRankDisguise } from '@/lib/features/rank-disguise'
 import { updateCustomProfileBg } from '@/lib/features/profile-background'
@@ -898,6 +899,9 @@ export function initFeatures() {
 
   updateAutoLockChampion(store.get('autoLockChampion'))
   store.onChange('autoLockChampion', updateAutoLockChampion)
+
+  updateHextechAramAutoLock(store.get('hextechAramAutoLock'))
+  store.onChange('hextechAramAutoLock', updateHextechAramAutoLock)
 
   updateAutoBanChampion(store.get('autoBanChampion'))
   store.onChange('autoBanChampion', updateAutoBanChampion)

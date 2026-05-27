@@ -816,6 +816,11 @@ class LCUManager {
     return get<number[]>('/lol-champ-select/v1/disabled-champion-ids')
   }
 
+  /** 获取海克斯大乱斗等子集选人阶段可选英雄 ID 列表 */
+  getChampSelectSubsetChampionIds(): Promise<number[]> {
+    return get<number[]>('/lol-lobby-team-builder/champ-select/v1/subset-champion-list')
+  }
+
   /**
    * 锁定英雄（完成选人/禁人动作）
    *
