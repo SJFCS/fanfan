@@ -167,30 +167,70 @@ export interface RegaliaBannerInventoryEntry {
 
 export type RegaliaBannerInventory = RegaliaBannerInventoryEntry[]
 
+export interface RewardItem {
+  id: string
+  itemId?: string
+  localizations?: {
+    title?: string
+  }
+  media?: {
+    iconUrl?: string
+  }
+}
+
+export interface RewardGroup {
+  id: string
+  localizations?: {
+    title?: string
+  }
+  rewards: RewardItem[]
+  selectionStrategyConfig?: {
+    maxSelectionsAllowed?: number
+  } | null
+}
+
 export interface RewardGrant {
   info: {
     id: string
     status: string
   }
-  rewardGroup: {
+  rewardGroup: RewardGroup
+}
+
+export interface RewardGroupResponse {
+  active?: boolean
+  celebrationType?: string
+  childRewardGroupIds?: unknown[]
+  id: string
+  localizations?: {
+    description?: string
+    title?: string
+  }
+  media?: {
+    iconUrl?: string
+    splashImage?: string
+  }
+  productId?: string
+  rewardStrategy?: string
+  rewards: Array<{
     id: string
+    itemId?: string
+    itemType?: string
     localizations?: {
+      details?: string
       title?: string
     }
-    rewards: Array<{
-      id: string
-      itemId?: string
-      localizations?: {
-        title?: string
-      }
-      media?: {
-        iconUrl?: string
-      }
-    }>
-    selectionStrategyConfig?: {
-      maxSelectionsAllowed?: number
+    media?: {
+      iconUrl?: string
+      splashImage?: string
     }
-  }
+    quantity?: number
+  }>
+  selectionStrategyConfig?: {
+    maxSelectionsAllowed?: number
+    minSelectionsAllowed?: number
+  } | null
+  types?: string[]
 }
 
 export interface MissionReward {
@@ -207,6 +247,26 @@ export interface Mission {
   rewardStrategy?: {
     selectMaxGroupCount?: number
   }
+}
+
+export interface EventHubEvent {
+  eventId: string
+  eventInfo: {
+    eventName: string
+    unclaimedRewardCount?: number
+  }
+}
+
+export interface EventHubRewardOption {
+  rewardGroupId: string
+  rewardName?: string
+  rewardDescription?: string
+  thumbIconPath?: string
+  state?: string
+}
+
+export interface EventHubRewardTrackItem {
+  rewardOptions?: EventHubRewardOption[]
 }
 
 function isRegaliaBannerInventoryEntry(value: unknown): value is RegaliaBannerInventoryEntry {
@@ -1262,6 +1322,10 @@ class LCUManager {
     return get<RewardGrant[]>(`/lol-rewards/v1/grants${params}`)
   }
 
+  getRewardGroups(): Promise<RewardGroupResponse[]> {
+    return get<RewardGroupResponse[]>('/lol-rewards/v1/groups')
+  }
+
   selectRewardGrant(grantId: string, data: {
     grantId: string
     rewardGroupId: string
@@ -1304,6 +1368,22 @@ class LCUManager {
 
   selectMissionRewardGroups(missionId: string, rewardGroups: string[]): Promise<void> {
     return put<void>(`/lol-missions/v1/player/${encodeURIComponent(missionId)}`, { rewardGroups })
+  }
+
+  getEventHubEvents(): Promise<EventHubEvent[]> {
+    return get<EventHubEvent[]>('/lol-event-hub/v1/events')
+  }
+
+  getEventHubRewardTrackItems(eventId: string): Promise<EventHubRewardTrackItem[]> {
+    return get<EventHubRewardTrackItem[]>(`/lol-event-hub/v1/events/${encodeURIComponent(eventId)}/reward-track/items`)
+  }
+
+  getEventHubRewardTrackBonusItems(eventId: string): Promise<EventHubRewardTrackItem[]> {
+    return get<EventHubRewardTrackItem[]>(`/lol-event-hub/v1/events/${encodeURIComponent(eventId)}/reward-track/bonus-items`)
+  }
+
+  claimAllEventHubRewards(eventId: string): Promise<void> {
+    return post<void>(`/lol-event-hub/v1/events/${encodeURIComponent(eventId)}/reward-track/claim-all`)
   }
 
   /** 获取当前召唤师的 Regalia 装饰配置 */

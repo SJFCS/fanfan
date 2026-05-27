@@ -1087,6 +1087,8 @@ export enum LcuEventUri {
   REWARDS_GRANTS = '/lol-rewards/v1/grants',
   /** 任务列表 */
   MISSIONS = '/lol-missions/v1/missions',
+  /** 活动中心事件 */
+  EVENT_HUB_EVENTS = '/lol-event-hub/v1/events',
 }
 
 // ==================== 聊天相关 ====================
