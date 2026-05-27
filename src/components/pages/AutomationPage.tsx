@@ -15,11 +15,29 @@ function ChampionPriorityCards({
   championIds,
   emptyText,
   onRemove,
+  onReorder,
 }: {
   championIds: number[]
   emptyText: string
   onRemove: (championId: number) => void
+  onReorder?: (championIds: number[]) => void
 }) {
+  const [draggedChampionId, setDraggedChampionId] = useState<number | null>(null)
+
+  const handleDrop = (targetChampionId: number) => {
+    if (!onReorder || draggedChampionId == null || draggedChampionId === targetChampionId) return
+
+    const fromIndex = championIds.indexOf(draggedChampionId)
+    const toIndex = championIds.indexOf(targetChampionId)
+    if (fromIndex < 0 || toIndex < 0) return
+
+    const next = [...championIds]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    onReorder(next)
+    setDraggedChampionId(null)
+  }
+
   if (championIds.length === 0) {
     return <p className="sona-subtitle" style={{ margin: 0 }}>{emptyText}</p>
   }
@@ -29,7 +47,27 @@ function ChampionPriorityCards({
       {championIds.map((championId, index) => {
         const champion = getChampionById(championId)
         return (
-          <div className="sona-champ-priority-card" key={championId}>
+          <div
+            className={`sona-champ-priority-card${onReorder ? ' sona-champ-priority-card-draggable' : ''}${draggedChampionId === championId ? ' is-dragging' : ''}`}
+            key={championId}
+            draggable={Boolean(onReorder)}
+            onDragStart={(event) => {
+              if (!onReorder) return
+              setDraggedChampionId(championId)
+              event.dataTransfer.effectAllowed = 'move'
+              event.dataTransfer.setData('text/plain', String(championId))
+            }}
+            onDragOver={(event) => {
+              if (!onReorder || draggedChampionId == null) return
+              event.preventDefault()
+              event.dataTransfer.dropEffect = 'move'
+            }}
+            onDrop={(event) => {
+              event.preventDefault()
+              handleDrop(championId)
+            }}
+            onDragEnd={() => setDraggedChampionId(null)}
+          >
             <span className="sona-champ-priority-index">{index + 1}</span>
             <img
               className="sona-champ-priority-icon"
@@ -42,6 +80,7 @@ function ChampionPriorityCards({
             <button
               className="sona-champ-priority-remove"
               type="button"
+              draggable={false}
               onClick={() => onRemove(championId)}
               aria-label="移除"
             >
@@ -161,6 +200,11 @@ export function AutomationPage() {
     const next = hextechAramAutoLockChampionIds.filter((id) => id !== championId)
     setHextechAramAutoLockChampionIds(next)
     store.set('hextechAramAutoLockChampionIds', next)
+  }
+
+  const reorderHextechAramAutoLockChampions = (championIds: number[]) => {
+    setHextechAramAutoLockChampionIds(championIds)
+    store.set('hextechAramAutoLockChampionIds', championIds)
   }
 
   const addAutoBanChampion = (champion: ChampionInfo) => {
@@ -367,6 +411,7 @@ export function AutomationPage() {
               championIds={hextechAramAutoLockChampionIds}
               emptyText={t('tools.hextechAramAutoLock.empty')}
               onRemove={removeHextechAramAutoLockChampion}
+              onReorder={reorderHextechAramAutoLockChampions}
             />
           </div>
         )}

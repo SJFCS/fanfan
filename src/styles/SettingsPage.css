@@ -1017,6 +1017,19 @@
   background: rgba(30, 35, 40, 0.58);
 }
 
+.sona-champ-priority-card-draggable {
+  cursor: grab;
+}
+
+.sona-champ-priority-card-draggable:active {
+  cursor: grabbing;
+}
+
+.sona-champ-priority-card-draggable.is-dragging {
+  opacity: 0.55;
+  border-color: rgba(200, 170, 110, 0.45);
+}
+
 .sona-champ-priority-index {
   min-width: 18px;
   height: 18px;
