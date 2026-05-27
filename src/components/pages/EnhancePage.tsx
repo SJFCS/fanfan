@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { SettingCard, SettingGroup } from '@/components/ui/SettingCard'
 import { SonaSwitch } from '@/components/ui/SonaSwitch'
 import { SonaSelect } from '@/components/ui/SonaSelect'
-import { store } from '@/lib/store'
+import { store, type InGameAutoPopupMode } from '@/lib/store'
 import { useI18n } from '@/i18n'
 import '@/styles/SettingsPage.css'
 
@@ -21,7 +21,7 @@ export function EnhancePage() {
   const [opggBuildRecommendation, setOpggBuildRecommendation] = useState(store.get('opggBuildRecommendation'))
   const [smartBuildRecommendation, setSmartBuildRecommendation] = useState(store.get('smartBuildRecommendation'))
   const [balanceBuffTooltip, setBalanceBuffTooltip] = useState(store.get('balanceBuffTooltip'))
-  const [gameAnalysisPopup, setGameAnalysisPopup] = useState(store.get('gameAnalysisPopup'))
+  const [inGameAutoPopupMode, setInGameAutoPopupMode] = useState(store.get('inGameAutoPopupMode'))
   const [analyzeTeamPower, setAnalyzeTeamPower] = useState(store.get('analyzeTeamPower'))
   const [analyzeTeamPowerMsgType, setAnalyzeTeamPowerMsgType] = useState(store.get('analyzeTeamPowerMsgType'))
   const [analyzeTeamPowerFetchCount, setAnalyzeTeamPowerFetchCount] = useState(store.get('analyzeTeamPowerFetchCount'))
@@ -40,7 +40,7 @@ export function EnhancePage() {
       store.onChange('opggBuildRecommendation', setOpggBuildRecommendation),
       store.onChange('smartBuildRecommendation', setSmartBuildRecommendation),
       store.onChange('balanceBuffTooltip', setBalanceBuffTooltip),
-      store.onChange('gameAnalysisPopup', setGameAnalysisPopup),
+      store.onChange('inGameAutoPopupMode', setInGameAutoPopupMode),
       store.onChange('analyzeTeamPower', setAnalyzeTeamPower),
       store.onChange('analyzeTeamPowerMsgType', setAnalyzeTeamPowerMsgType),
       store.onChange('analyzeTeamPowerFetchCount', setAnalyzeTeamPowerFetchCount),
@@ -160,6 +160,31 @@ export function EnhancePage() {
           />
         </SettingCard>
         <SettingCard
+          title={t('tools.inGameAutoPopup.title')}
+          description={t('tools.inGameAutoPopup.description')}
+        >
+          {inGameAutoPopupMode === 'gameAnalysis' && (
+            <SonaSelect
+              value={String(gameAnalysisFetchCount)}
+              onChange={(v) => { setGameAnalysisFetchCount(Number(v)); store.set('gameAnalysisFetchCount', Number(v)) }}
+              options={recentOptions}
+            />
+          )}
+          <SonaSelect
+            value={inGameAutoPopupMode}
+            onChange={(v) => {
+              const mode = v as InGameAutoPopupMode
+              setInGameAutoPopupMode(mode)
+              store.set('inGameAutoPopupMode', mode)
+            }}
+            options={[
+              { value: 'none', label: t('option.inGameAutoPopup.none') },
+              { value: 'gameAnalysis', label: t('option.inGameAutoPopup.gameAnalysis') },
+              { value: 'buildRecommendation', label: t('option.inGameAutoPopup.buildRecommendation') },
+            ]}
+          />
+        </SettingCard>
+        <SettingCard
           title={t('tools.balanceBuffTooltip.title')}
           description={t('tools.balanceBuffTooltip.description')}
         >
@@ -178,20 +203,6 @@ export function EnhancePage() {
             onChange={(v) => { setChampSelectQuitButton(v); store.set('champSelectQuitButton', v) }}
           />
         </SettingCard> */}
-        <SettingCard
-          title={t('tools.gameAnalysisPopup.title')}
-          description={t('tools.gameAnalysisPopup.description')}
-        >
-          <SonaSelect
-            value={String(gameAnalysisFetchCount)}
-            onChange={(v) => { setGameAnalysisFetchCount(Number(v)); store.set('gameAnalysisFetchCount', Number(v)) }}
-            options={recentOptions}
-          />
-          <SonaSwitch
-            checked={gameAnalysisPopup}
-            onChange={(v) => { setGameAnalysisPopup(v); store.set('gameAnalysisPopup', v) }}
-          />
-        </SettingCard>
       </SettingGroup>
     </div>
   )

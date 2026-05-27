@@ -21,6 +21,8 @@
 
 // ==================== 配置项定义 ====================
 
+export type InGameAutoPopupMode = 'none' | 'gameAnalysis' | 'buildRecommendation'
+
 /** 所有配置项及其类型 */
 export interface SonaConfig {
   /** 自动接受对局 */
@@ -91,6 +93,8 @@ export interface SonaConfig {
   champSelectAssistFetchCount: number
   /** 全局战力分析查询局数（20/50/100），默认50 */
   gameAnalysisFetchCount: number
+  /** 进入游戏后自动弹出的客户端弹窗 */
+  inGameAutoPopupMode: InGameAutoPopupMode
   /** 选人阶段红蓝方提示（进入英雄选择时在聊天框提示当前阵营） */
   sideIndicator: boolean
   /** 红蓝方提示消息类型: chat=队友可见, celebration=仅自己可见 */
@@ -195,7 +199,7 @@ export interface SonaConfig {
   unlockChromas: boolean
   /** 选人阶段退出按钮（非自定义对局的英雄选择里补上"退出对局"按钮） */
   champSelectQuitButton: boolean
-  /** 进入游戏后自动弹窗显示全局战力分析 */
+  /** @deprecated 旧版进入游戏后自动弹窗显示全局战力分析开关，已迁移到 inGameAutoPopupMode */
   gameAnalysisPopup: boolean
   /** 对局结束后自动返回房间 */
   autoReturnToLobby: boolean
@@ -235,6 +239,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   analyzeTeamPowerDisplayMode: 'legacy',
   champSelectAssistFetchCount: 50,
   gameAnalysisFetchCount: 50,
+  inGameAutoPopupMode: 'none',
   sideIndicator: false,
   sideIndicatorMsgType: 'celebration',
   globalParticle: false,
@@ -305,6 +310,8 @@ class SonaStore {
     for (const key of Object.keys(DEFAULT_CONFIG) as ConfigKey[]) {
       (loaded as Record<string, unknown>)[key] = this.readFromDisk(key)
     }
+    this.migrateLegacyAutoReturnMode(loaded)
+    this.migrateLegacyInGameAutoPopupMode(loaded)
     this.cache = loaded
   }
 
@@ -398,6 +405,27 @@ class SonaStore {
   private readFromDisk<K extends ConfigKey>(key: K): SonaConfig[K] {
     const stored = DataStore.get<SonaConfig[K]>(`${KEY_PREFIX}${key}`)
     return stored !== undefined ? stored : DEFAULT_CONFIG[key]
+  }
+
+  private migrateLegacyAutoReturnMode(loaded: SonaConfig) {
+    const legacyMode = DataStore.get<LegacyAutoReturnMode>(`${KEY_PREFIX}autoReturnMode`)
+    const storedAutoMatchmaking = DataStore.get<SonaConfig['autoMatchmaking']>(`${KEY_PREFIX}autoMatchmaking`)
+
+    if (storedAutoMatchmaking === undefined && loaded.autoReturnToLobby && legacyMode !== 'lobby') {
+      loaded.autoMatchmaking = true
+      DataStore.set(`${KEY_PREFIX}autoMatchmaking`, true)
+    }
+  }
+
+  private migrateLegacyInGameAutoPopupMode(loaded: SonaConfig) {
+    const storedMode = DataStore.get<SonaConfig['inGameAutoPopupMode']>(`${KEY_PREFIX}inGameAutoPopupMode`)
+    if (storedMode !== undefined) return
+
+    const legacyGameAnalysisPopup = DataStore.get<SonaConfig['gameAnalysisPopup']>(`${KEY_PREFIX}gameAnalysisPopup`)
+    if (legacyGameAnalysisPopup) {
+      loaded.inGameAutoPopupMode = 'gameAnalysis'
+      DataStore.set(`${KEY_PREFIX}inGameAutoPopupMode`, loaded.inGameAutoPopupMode)
+    }
   }
 }
 

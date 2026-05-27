@@ -830,11 +830,16 @@ export function initFeatures() {
   })
 
   const updateOpggLifecycle = () => {
-    updateOpggBuildRecommendation(store.get('opggBuildRecommendation') || store.get('smartBuildRecommendation'))
+    updateOpggBuildRecommendation(
+      store.get('opggBuildRecommendation')
+      || store.get('smartBuildRecommendation')
+      || store.get('inGameAutoPopupMode') === 'buildRecommendation',
+    )
   }
   updateOpggLifecycle()
   store.onChange('opggBuildRecommendation', updateOpggLifecycle)
   store.onChange('smartBuildRecommendation', updateOpggLifecycle)
+  store.onChange('inGameAutoPopupMode', updateOpggLifecycle)
 
   updateGlobalParticle(store.get('globalParticle'))
   store.onChange('globalParticle', updateGlobalParticle)
@@ -903,8 +908,11 @@ export function initFeatures() {
   updateChampSelectQuitButton(store.get('champSelectQuitButton'))
   store.onChange('champSelectQuitButton', updateChampSelectQuitButton)
 
-  updateGameAnalysisPopup(store.get('gameAnalysisPopup'))
-  store.onChange('gameAnalysisPopup', updateGameAnalysisPopup)
+  const syncGameAnalysisPopup = () => {
+    updateGameAnalysisPopup(store.get('inGameAutoPopupMode') === 'gameAnalysis')
+  }
+  syncGameAnalysisPopup()
+  store.onChange('inGameAutoPopupMode', syncGameAnalysisPopup)
 
   updateAutoReturnToLobby(store.get('autoReturnToLobby'))
   store.onChange('autoReturnToLobby', updateAutoReturnToLobby)

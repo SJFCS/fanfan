@@ -106,6 +106,7 @@ let smartLoadoutRestoreTimer: number | null = null
 let pendingSmartLoadoutContext: RecommendationContext | null = null
 let lastObservedSpellKey = ''
 let lastObservedSpellSignature = ''
+let lastInGameAutoPopupGameId = 0
 const itemSetSyncInFlightKeys = new Set<string>()
 const runeApplyInFlightKeys = new Set<string>()
 const spellApplyInFlightKeys = new Set<string>()
@@ -1234,6 +1235,28 @@ export async function showOpggBuildRecommendationModal() {
   renderInGameBuildRecommendationModal(context, cacheEntry, token)
 }
 
+function maybeShowInGameBuildRecommendationAutoPopup() {
+  if (store.get('inGameAutoPopupMode') !== 'buildRecommendation') return
+
+  void (async () => {
+    try {
+      const session = await lcu.getGameflowSession()
+      const gameId = session.gameData?.gameId ?? 0
+      if (gameId > 0 && gameId === lastInGameAutoPopupGameId) return
+      lastInGameAutoPopupGameId = gameId > 0 ? gameId : -1
+      await showOpggBuildRecommendationModal()
+    } catch (err) {
+      if (lastInGameAutoPopupGameId === -1) return
+      lastInGameAutoPopupGameId = -1
+      try {
+        await showOpggBuildRecommendationModal()
+      } catch (modalErr) {
+        logger.warn('[OPGG] 自动打开游戏内配装推荐弹窗失败:', modalErr || err)
+      }
+    }
+  })()
+}
+
 async function openRecommendationPanel(anchor: HTMLElement, contextOverride?: RecommendationContext) {
   if (contextOverride) {
     currentContext = { ...contextOverride }
@@ -1541,7 +1564,9 @@ function startOpggListeners() {
     } else if (phase === 'InProgress') {
       unmount()
       registerInGameBuildButton()
+      maybeShowInGameBuildRecommendationAutoPopup()
     } else {
+      lastInGameAutoPopupGameId = 0
       unregisterInGameBuildButton()
       unmount()
     }
@@ -1565,6 +1590,7 @@ function startOpggListeners() {
       scheduleRefreshWhenChampionLocked()
     } else if (phase === 'InProgress') {
       registerInGameBuildButton()
+      maybeShowInGameBuildRecommendationAutoPopup()
     }
   }).catch(() => { /* ignore */ })
 
@@ -1580,6 +1606,7 @@ export function updateOpggBuildRecommendation(enabled: boolean) {
         scheduleRefreshWhenChampionLocked()
       } else if (phase === 'InProgress') {
         registerInGameBuildButton()
+        maybeShowInGameBuildRecommendationAutoPopup()
       }
     }).catch(() => { /* ignore */ })
   } else if (!enabled) {
@@ -1587,6 +1614,7 @@ export function updateOpggBuildRecommendation(enabled: boolean) {
 
     phaseUnsub()
     phaseUnsub = null
+    lastInGameAutoPopupGameId = 0
     unregisterInGameBuildButton()
     if (champSelectUnsub) {
       champSelectUnsub()
