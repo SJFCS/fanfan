@@ -33,6 +33,7 @@
 
 .sona-input-field {
   width: 100%;
+  box-sizing: border-box;
   background: transparent;
   border: none;
   color: #f0e6d2;

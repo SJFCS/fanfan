@@ -335,7 +335,7 @@ export function AutomationPage() {
 
   return (
     <div className="sona-settings">
-      <SettingGroup title={t('tools.group.automation')}>      
+      <SettingGroup title={t('tools.group.lobbyAutomation')}>
         <SettingCard
           title={t('tools.autoAccept.title')}
           description={t('tools.autoAccept.description')}
@@ -445,6 +445,8 @@ export function AutomationPage() {
             </div>
           </div>
         )}
+      </SettingGroup>
+      <SettingGroup title={t('tools.group.champSelectAutomation')}>
         <SettingCard
           title={t('tools.autoLock.title')}
           description={t('tools.autoLock.description')}
@@ -507,55 +509,6 @@ export function AutomationPage() {
           </div>
         )}
         <SettingCard
-          title={t('tools.hextechAramAutoLock.title')}
-          description={t('tools.hextechAramAutoLock.description')}
-        >
-          <SonaSwitch
-            checked={hextechAramAutoLock}
-            onChange={(v) => { setHextechAramAutoLock(v); store.set('hextechAramAutoLock', v) }}
-          />
-        </SettingCard>
-        {hextechAramAutoLock && (
-          <div className="sona-setting-switch-panel">
-            <div className="sona-debug-actions" style={{ alignItems: 'flex-start', gap: 8 }}>
-              <div style={{ flex: 1, position: 'relative' }} ref={hextechChampSuggestRef}>
-                <SonaInput
-                  value={hextechChampSearchText}
-                  onChange={(v) => {
-                    setHextechChampSearchText(v)
-                    const results = searchChampions(v)
-                    setHextechChampSuggestions(results)
-                    setShowHextechChampSuggestions(results.length > 0)
-                  }}
-                  placeholder={t('tools.hextechAramAutoLock.searchPlaceholder')}
-                />
-                {showHextechChampSuggestions && hextechChampSuggestions.length > 0 && (
-                  <div className="sona-champ-suggest">
-                    {hextechChampSuggestions.map((c) => (
-                      <button
-                        key={c.id}
-                        className="sona-champ-suggest-item"
-                        type="button"
-                        onClick={() => addHextechAramAutoLockChampion(c)}
-                      >
-                        <img className="sona-champ-suggest-icon" src={`/lol-game-data/assets/v1/champion-icons/${c.id}.png`} alt="" />
-                        <span className="sona-champ-suggest-title">{c.title}</span>
-                        <span className="sona-champ-suggest-name">{c.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <ChampionPriorityCards
-              championIds={hextechAramAutoLockChampionIds}
-              emptyText={t('tools.hextechAramAutoLock.empty')}
-              onRemove={removeHextechAramAutoLockChampion}
-              onReorder={reorderHextechAramAutoLockChampions}
-            />
-          </div>
-        )}
-        <SettingCard
           title={t('tools.autoBan.title')}
           description={t('tools.autoBan.description')}
         >
@@ -603,6 +556,55 @@ export function AutomationPage() {
             />
           </div>
         )}
+        <SettingCard
+          title={t('tools.hextechAramAutoLock.title')}
+          description={t('tools.hextechAramAutoLock.description')}
+        >
+          <SonaSwitch
+            checked={hextechAramAutoLock}
+            onChange={(v) => { setHextechAramAutoLock(v); store.set('hextechAramAutoLock', v) }}
+          />
+        </SettingCard>
+        {hextechAramAutoLock && (
+          <div className="sona-setting-switch-panel">
+            <div className="sona-debug-actions" style={{ alignItems: 'flex-start', gap: 8 }}>
+              <div style={{ flex: 1, position: 'relative' }} ref={hextechChampSuggestRef}>
+                <SonaInput
+                  value={hextechChampSearchText}
+                  onChange={(v) => {
+                    setHextechChampSearchText(v)
+                    const results = searchChampions(v)
+                    setHextechChampSuggestions(results)
+                    setShowHextechChampSuggestions(results.length > 0)
+                  }}
+                  placeholder={t('tools.hextechAramAutoLock.searchPlaceholder')}
+                />
+                {showHextechChampSuggestions && hextechChampSuggestions.length > 0 && (
+                  <div className="sona-champ-suggest">
+                    {hextechChampSuggestions.map((c) => (
+                      <button
+                        key={c.id}
+                        className="sona-champ-suggest-item"
+                        type="button"
+                        onClick={() => addHextechAramAutoLockChampion(c)}
+                      >
+                        <img className="sona-champ-suggest-icon" src={`/lol-game-data/assets/v1/champion-icons/${c.id}.png`} alt="" />
+                        <span className="sona-champ-suggest-title">{c.title}</span>
+                        <span className="sona-champ-suggest-name">{c.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <ChampionPriorityCards
+              championIds={hextechAramAutoLockChampionIds}
+              emptyText={t('tools.hextechAramAutoLock.empty')}
+              onRemove={removeHextechAramAutoLockChampion}
+              onReorder={reorderHextechAramAutoLockChampions}
+            />
+          </div>
+        )}        
       </SettingGroup>
     </div>
   )
