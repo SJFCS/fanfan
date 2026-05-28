@@ -58,30 +58,7 @@ export function EnhancePage() {
 
   return (
     <div className="sona-settings">
-      <SettingGroup title={t('tools.group.enhance')}>
-        <SettingCard
-          title={t('tools.benchNoCooldown.title')}
-          description={t('tools.benchNoCooldown.description')}
-        >
-          <SonaSwitch
-            checked={benchNoCooldown}
-            onChange={(v) => { setBenchNoCooldown(v); store.set('benchNoCooldown', v) }}
-          />
-        </SettingCard>
-        <SettingCard
-          title={t('tools.lobbyEnhancement.title')}
-          description={t('tools.lobbyEnhancement.description')}
-        >
-          <SonaSelect
-            value={String(lobbyEnhancementFetchCount)}
-            onChange={(v) => { setLobbyEnhancementFetchCount(Number(v)); store.set('lobbyEnhancementFetchCount', Number(v)) }}
-            options={recentOptions}
-          />
-          <SonaSwitch
-            checked={lobbyEnhancement}
-            onChange={(v) => { setLobbyEnhancement(v); store.set('lobbyEnhancement', v) }}
-          />
-        </SettingCard>
+      <SettingGroup title={t('tools.group.enhanceInsights')}>
         <SettingCard
           title={t('tools.analyzeTeamPower.title')}
           description={t('tools.analyzeTeamPower.description')}
@@ -139,6 +116,41 @@ export function EnhancePage() {
           <SonaSwitch
             checked={champSelectAssist}
             onChange={(v) => { setChampSelectAssist(v); store.set('champSelectAssist', v) }}
+          />
+        </SettingCard>
+        <SettingCard
+          title={t('tools.lobbyEnhancement.title')}
+          description={t('tools.lobbyEnhancement.description')}
+        >
+          <SonaSelect
+            value={String(lobbyEnhancementFetchCount)}
+            onChange={(v) => { setLobbyEnhancementFetchCount(Number(v)); store.set('lobbyEnhancementFetchCount', Number(v)) }}
+            options={recentOptions}
+          />
+          <SonaSwitch
+            checked={lobbyEnhancement}
+            onChange={(v) => { setLobbyEnhancement(v); store.set('lobbyEnhancement', v) }}
+          />
+        </SettingCard>
+        <SettingCard
+          title={t('tools.balanceBuffTooltip.title')}
+          description={t('tools.balanceBuffTooltip.description')}
+        >
+          <SonaSwitch
+            checked={balanceBuffTooltip}
+            onChange={(v) => { setBalanceBuffTooltip(v); store.set('balanceBuffTooltip', v) }}
+          />
+        </SettingCard>
+      </SettingGroup>
+
+      <SettingGroup title={t('tools.group.enhanceActions')}>
+        <SettingCard
+          title={t('tools.benchNoCooldown.title')}
+          description={t('tools.benchNoCooldown.description')}
+        >
+          <SonaSwitch
+            checked={benchNoCooldown}
+            onChange={(v) => { setBenchNoCooldown(v); store.set('benchNoCooldown', v) }}
           />
         </SettingCard>
         <SettingCard
