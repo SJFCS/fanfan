@@ -37,15 +37,28 @@ export function SonaSelect({
   const displayPlaceholder = placeholder === '请选择...' ? t('select.placeholder') : placeholder
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+    if (!isOpen) return
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target
+      if (dropdownRef.current && target instanceof Node && !dropdownRef.current.contains(target)) {
         setIsOpen(false)
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown, true)
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown, true)
+      window.removeEventListener('keydown', handleKeyDown, true)
+    }
+  }, [isOpen])
 
   return (
     <div className={`sona-select${className ? ` ${className}` : ''}`} ref={dropdownRef}>
