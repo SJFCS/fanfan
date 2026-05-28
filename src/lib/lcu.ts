@@ -29,6 +29,10 @@ import type {
   LCUEventMessage,
   MatchHistoryResponse,
   MatchDetail,
+  MatchGame,
+  Participant,
+  ParticipantIdentity,
+  MatchTeam,
   ChatFriend,
   ChatFriendGroup,
   GiftableFriend,
@@ -39,7 +43,7 @@ import type {
   ChampSelectSummoner,
 } from '@/types/lcu'
 import { SGP_SERVERS } from '@/types/sgp'
-import type { SgpEntitlementsToken } from '@/types/sgp'
+import type { SgpEntitlementsToken, SgpGameSummaryLol, SgpMatchHistoryLol, SgpParticipantLol, SgpPerks, SgpTeam } from '@/types/sgp'
 import { store } from '@/lib/store'
 
 // Re-export types for convenience
@@ -1239,39 +1243,367 @@ class LCUManager {
     startIndex?: number
     count?: number
     tag?: string
-  }): Promise<import('@/types/sgp').SgpMatchHistoryLol> {
-    const token = this._entitlementsToken ?? await this.getEntitlementsToken()
-    if (!this._entitlementsToken) {
-      this._entitlementsToken = token
-    }
-    const sgpServerId = await this.getSgpServerId()
-    const server = SGP_SERVERS[sgpServerId.toUpperCase()]
-    if (!server?.matchHistory) {
-      throw new Error(`[SGP] 找不到服务器配置: ${sgpServerId}`)
-    }
-
-    const params = new URLSearchParams()
-    params.set('startIndex', String(options?.startIndex ?? 0))
-    params.set('count', String(options?.count ?? 100))
-    if (options?.tag) {
-      params.set('tag', options.tag)
+  }): Promise<SgpMatchHistoryLol> {
+    const debugContext: {
+      platformId: string
+      sgpServerId: string
+      matchHistoryBaseUrl: string
+      requestUrl: string
+      issuer: string
+    } = {
+      platformId: '',
+      sgpServerId: '',
+      matchHistoryBaseUrl: '',
+      requestUrl: '',
+      issuer: this._entitlementsToken?.issuer ?? '',
     }
 
-    const url = `${server.matchHistory}/match-history-query/v1/products/lol/player/${puuid}/SUMMARY?${params}`
+    try {
+      const chatMe = await this.getChatMe().catch(() => null)
+      debugContext.platformId = chatMe?.platformId ?? ''
 
-    const resp = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${token.accessToken}`,
-        'User-Agent': 'LeagueOfLegendsClient/14.13.596.7996 (rcp-be-lol-match-history)',
-      },
+      const token = this._entitlementsToken ?? await this.getEntitlementsToken()
+      if (!this._entitlementsToken) {
+        this._entitlementsToken = token
+      }
+      debugContext.issuer = token.issuer ?? debugContext.issuer
+
+      const sgpServerId = await this.getSgpServerId()
+      debugContext.sgpServerId = sgpServerId
+      const server = SGP_SERVERS[sgpServerId.toUpperCase()]
+      debugContext.matchHistoryBaseUrl = server?.matchHistory ?? ''
+      if (!server?.matchHistory) {
+        throw new Error(`[SGP] 找不到服务器配置: ${sgpServerId}`)
+      }
+
+      const params = new URLSearchParams()
+      params.set('startIndex', String(options?.startIndex ?? 0))
+      params.set('count', String(options?.count ?? 100))
+      if (options?.tag) {
+        params.set('tag', options.tag)
+      }
+
+      const url = `${server.matchHistory}/match-history-query/v1/products/lol/player/${puuid}/SUMMARY?${params}`
+      debugContext.requestUrl = url
+
+      const resp = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token.accessToken}`,
+          'User-Agent': 'LeagueOfLegendsClient/14.13.596.7996 (rcp-be-lol-match-history)',
+        },
+      })
+
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '')
+        throw new Error(`[SGP] 请求失败: ${resp.status} ${resp.statusText} ${body.slice(0, 1000)}`)
+      }
+
+      return resp.json()
+    } catch (err) {
+      console.error('[SGP] 战绩查询失败，回退到客户端原生战绩接口', {
+        platformId: debugContext.platformId || 'unknown',
+        sgpServerId: debugContext.sgpServerId || 'unknown',
+        matchHistoryBaseUrl: debugContext.matchHistoryBaseUrl || 'unknown',
+        issuer: debugContext.issuer || 'unknown',
+        puuid,
+        startIndex: options?.startIndex ?? 0,
+        count: options?.count ?? 100,
+        tag: options?.tag ?? '',
+        requestUrl: debugContext.requestUrl || 'not-built',
+        errorName: err instanceof Error ? err.name : typeof err,
+        errorMessage: err instanceof Error ? err.message : String(err),
+        error: err,
+      })
+      return this.getNativeMatchHistoryAsSgp(puuid, options)
+    }
+  }
+
+  private async getNativeMatchHistoryAsSgp(puuid: string, options?: {
+    startIndex?: number
+    count?: number
+    tag?: string
+  }): Promise<SgpMatchHistoryLol> {
+    const startIndex = Math.max(0, options?.startIndex ?? 0)
+    const count = Math.max(1, options?.count ?? 100)
+    const queueId = this.parseQueueIdFromSgpTag(options?.tag)
+
+    // LCU 原生接口不支持 tag。带队列过滤时从最近 100 场中本地过滤后再模拟 SGP 分页。
+    const begIndex = queueId ? 0 : startIndex
+    const endIndex = queueId
+      ? 99
+      : startIndex + count - 1
+    const native = await this.getMatchHistory(puuid, begIndex, endIndex)
+    const nativeGames = native.games?.games ?? []
+    const filteredGames = queueId
+      ? nativeGames.filter((game) => game.queueId === queueId).slice(startIndex, startIndex + count)
+      : nativeGames
+
+    return {
+      games: filteredGames.map((game) => this.mapNativeMatchGameToSgpGame(game)),
+    }
+  }
+
+  private parseQueueIdFromSgpTag(tag: string | undefined): number | null {
+    const match = tag?.match(/^q_(\d+)$/)
+    if (!match) return null
+
+    const queueId = Number.parseInt(match[1], 10)
+    return Number.isFinite(queueId) && queueId > 0 ? queueId : null
+  }
+
+  private mapNativeMatchGameToSgpGame(game: MatchGame): SgpGameSummaryLol {
+    const identitiesByParticipantId = new Map<number, ParticipantIdentity>()
+    game.participantIdentities.forEach((identity) => {
+      identitiesByParticipantId.set(identity.participantId, identity)
     })
 
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => '')
-      throw new Error(`[SGP] 请求失败: ${resp.status} ${resp.statusText} ${body}`)
+    const participants = game.participants.map((participant) => {
+      return this.mapNativeParticipantToSgpParticipant(participant, identitiesByParticipantId.get(participant.participantId), game.gameDuration)
+    })
+
+    return {
+      metadata: {
+        product: 'lol',
+        tags: [`q_${game.queueId}`],
+        participants: participants.map((participant) => participant.puuid).filter(Boolean),
+        timestamp: new Date(game.gameCreation).toISOString(),
+        data_version: '',
+        info_type: 'SUMMARY',
+        match_id: `${game.platformId}_${game.gameId}`,
+        private: false,
+      },
+      json: {
+        endOfGameResult: game.endOfGameResult,
+        gameCreation: game.gameCreation,
+        gameDuration: game.gameDuration,
+        gameEndTimestamp: game.gameCreation + game.gameDuration * 1000,
+        gameId: game.gameId,
+        gameMode: game.gameMode,
+        gameModeMutators: game.gameModeMutators ?? [],
+        gameName: '',
+        gameStartTimestamp: game.gameCreation,
+        gameType: game.gameType,
+        gameVersion: game.gameVersion,
+        mapId: game.mapId,
+        participants,
+        platformId: game.platformId,
+        queueId: game.queueId,
+        seasonId: game.seasonId,
+        teams: game.teams.map((team) => this.mapNativeTeamToSgpTeam(team)),
+        tournamentCode: '',
+      },
+    }
+  }
+
+  private mapNativeTeamToSgpTeam(team: MatchTeam): SgpTeam {
+    return {
+      bans: [],
+      objectives: {
+        baron: { first: team.firstBaron, kills: team.baronKills },
+        champion: { first: team.firstBlood, kills: 0 },
+        dragon: { first: team.firstDargon, kills: team.dragonKills },
+        horde: { first: false, kills: team.hordeKills },
+        inhibitor: { first: team.firstInhibitor, kills: team.inhibitorKills },
+        riftHerald: { first: false, kills: team.riftHeraldKills },
+        tower: { first: team.firstTower, kills: team.towerKills },
+      },
+      teamId: team.teamId,
+      win: team.win === 'Win',
+    }
+  }
+
+  private mapNativeParticipantToSgpParticipant(
+    participant: Participant,
+    identity: ParticipantIdentity | undefined,
+    gameDuration: number,
+  ): SgpParticipantLol {
+    const stats = participant.stats
+    const player = identity?.player
+    const timePlayed = gameDuration || 0
+    const perks: SgpPerks = {
+      statPerks: {
+        defense: 0,
+        flex: 0,
+        offense: 0,
+      },
+      styles: [
+        {
+          description: 'primaryStyle',
+          style: stats.perkPrimaryStyle || 0,
+          selections: [
+            { perk: stats.perk0 || 0, var1: stats.perk0Var1 || 0, var2: stats.perk0Var2 || 0, var3: stats.perk0Var3 || 0 },
+            { perk: stats.perk1 || 0, var1: stats.perk1Var1 || 0, var2: stats.perk1Var2 || 0, var3: stats.perk1Var3 || 0 },
+            { perk: stats.perk2 || 0, var1: stats.perk2Var1 || 0, var2: stats.perk2Var2 || 0, var3: stats.perk2Var3 || 0 },
+            { perk: stats.perk3 || 0, var1: stats.perk3Var1 || 0, var2: stats.perk3Var2 || 0, var3: stats.perk3Var3 || 0 },
+          ],
+        },
+        {
+          description: 'subStyle',
+          style: stats.perkSubStyle || 0,
+          selections: [
+            { perk: stats.perk4 || 0, var1: stats.perk4Var1 || 0, var2: stats.perk4Var2 || 0, var3: stats.perk4Var3 || 0 },
+            { perk: stats.perk5 || 0, var1: stats.perk5Var1 || 0, var2: stats.perk5Var2 || 0, var3: stats.perk5Var3 || 0 },
+          ],
+        },
+      ],
     }
 
-    return resp.json()
+    const challenges = {
+      damagePerMinute: timePlayed > 0 ? (stats.totalDamageDealtToChampions / timePlayed) * 60 : 0,
+      goldPerMinute: timePlayed > 0 ? (stats.goldEarned / timePlayed) * 60 : 0,
+      kda: stats.deaths > 0 ? (stats.kills + stats.assists) / stats.deaths : stats.kills + stats.assists,
+      visionScorePerMinute: timePlayed > 0 ? (stats.visionScore / timePlayed) * 60 : 0,
+    } as SgpParticipantLol['challenges']
+
+    return {
+      PlayerBehavior: { PlayerBehavior_IsHeroInCombat: 0 },
+      PlayerScore0: stats.playerScore0 || 0,
+      PlayerScore1: stats.playerScore1 || 0,
+      PlayerScore2: stats.playerScore2 || 0,
+      PlayerScore3: stats.playerScore3 || 0,
+      PlayerScore4: stats.playerScore4 || 0,
+      PlayerScore5: stats.playerScore5 || 0,
+      PlayerScore6: stats.playerScore6 || 0,
+      PlayerScore7: stats.playerScore7 || 0,
+      PlayerScore8: stats.playerScore8 || 0,
+      PlayerScore9: stats.playerScore9 || 0,
+      PlayerScore10: 0,
+      PlayerScore11: 0,
+      assists: stats.assists,
+      challenges,
+      champExperience: 0,
+      champLevel: stats.champLevel,
+      championId: participant.championId,
+      championName: '',
+      championTransform: 0,
+      damageDealtToBuildings: stats.damageDealtToTurrets,
+      damageDealtToEpicMonsters: 0,
+      damageDealtToObjectives: stats.damageDealtToObjectives,
+      damageDealtToTurrets: stats.damageDealtToTurrets,
+      damageSelfMitigated: stats.damageSelfMitigated,
+      deaths: stats.deaths,
+      detectorWardsPlaced: stats.visionWardsBoughtInGame,
+      doubleKills: stats.doubleKills,
+      dragonKills: 0,
+      eligibleForProgression: true,
+      firstBloodAssist: stats.firstBloodAssist,
+      firstBloodKill: stats.firstBloodKill,
+      firstTowerAssist: stats.firstTowerAssist,
+      firstTowerKill: stats.firstTowerKill,
+      gameEndedInEarlySurrender: stats.gameEndedInEarlySurrender,
+      gameEndedInSurrender: stats.gameEndedInSurrender,
+      goldEarned: stats.goldEarned,
+      goldSpent: stats.goldSpent,
+      individualPosition: participant.timeline?.lane || '',
+      inhibitorKills: stats.inhibitorKills,
+      item0: stats.item0,
+      item1: stats.item1,
+      item2: stats.item2,
+      item3: stats.item3,
+      item4: stats.item4,
+      item5: stats.item5,
+      item6: stats.item6,
+      killingSprees: stats.killingSprees,
+      kills: stats.kills,
+      lane: participant.timeline?.lane || '',
+      largestCriticalStrike: stats.largestCriticalStrike,
+      largestKillingSpree: stats.largestKillingSpree,
+      largestMultiKill: stats.largestMultiKill,
+      longestTimeSpentLiving: stats.longestTimeSpentLiving,
+      magicDamageDealt: stats.magicDamageDealt,
+      magicDamageDealtToChampions: stats.magicDamageDealtToChampions,
+      magicDamageTaken: stats.magicalDamageTaken,
+      missions: {},
+      neutralMinionsKilled: stats.neutralMinionsKilled,
+      participantId: participant.participantId,
+      pentaKills: stats.pentaKills,
+      perks,
+      physicalDamageDealt: stats.physicalDamageDealt,
+      physicalDamageDealtToChampions: stats.physicalDamageDealtToChampions,
+      physicalDamageTaken: stats.physicalDamageTaken,
+      placement: stats.subteamPlacement,
+      playerAugment1: stats.playerAugment1,
+      playerAugment2: stats.playerAugment2,
+      playerAugment3: stats.playerAugment3,
+      playerAugment4: stats.playerAugment4,
+      playerAugment5: stats.playerAugment5,
+      playerAugment6: stats.playerAugment6,
+      playerSubteamId: stats.playerSubteamId,
+      profileIcon: player?.profileIcon ?? 0,
+      puuid: player?.puuid ?? '',
+      quadraKills: stats.quadraKills,
+      riotIdGameName: player?.gameName ?? player?.summonerName ?? '',
+      riotIdTagline: player?.tagLine ?? '',
+      role: participant.timeline?.role || '',
+      roleBoundItem: stats.roleBoundItem,
+      sightWardsBoughtInGame: stats.sightWardsBoughtInGame,
+      spell1Id: participant.spell1Id,
+      spell2Id: participant.spell2Id,
+      subteamPlacement: stats.subteamPlacement,
+      summonerId: player?.summonerId ?? 0,
+      summonerLevel: 0,
+      summonerName: player?.summonerName ?? player?.gameName ?? '',
+      teamEarlySurrendered: stats.teamEarlySurrendered,
+      teamId: participant.teamId,
+      teamPosition: participant.timeline?.lane || '',
+      timeCCingOthers: stats.timeCCingOthers,
+      timePlayed,
+      totalDamageDealt: stats.totalDamageDealt,
+      totalDamageDealtToChampions: stats.totalDamageDealtToChampions,
+      totalDamageShieldedOnTeammates: 0,
+      totalDamageTaken: stats.totalDamageTaken,
+      totalHeal: stats.totalHeal,
+      totalHealsOnTeammates: 0,
+      totalMinionsKilled: stats.totalMinionsKilled,
+      totalTimeCCDealt: stats.totalTimeCrowdControlDealt,
+      totalTimeSpentDead: 0,
+      totalUnitsHealed: stats.totalUnitsHealed,
+      tripleKills: stats.tripleKills,
+      trueDamageDealt: stats.trueDamageDealt,
+      trueDamageDealtToChampions: stats.trueDamageDealtToChampions,
+      trueDamageTaken: stats.trueDamageTaken,
+      turretKills: stats.turretKills,
+      turretTakedowns: stats.turretKills,
+      turretsLost: 0,
+      unrealKills: stats.unrealKills,
+      visionScore: stats.visionScore,
+      visionWardsBoughtInGame: stats.visionWardsBoughtInGame,
+      wardsKilled: stats.wardsKilled,
+      wardsPlaced: stats.wardsPlaced,
+      win: stats.win,
+      allInPings: 0,
+      assistMePings: 0,
+      baronKills: 0,
+      basicPings: 0,
+      commandPings: 0,
+      consumablesPurchased: 0,
+      dangerPings: 0,
+      enemyMissingPings: 0,
+      enemyVisionPings: 0,
+      getBackPings: 0,
+      holdPings: 0,
+      inhibitorTakedowns: stats.inhibitorKills,
+      inhibitorsLost: 0,
+      itemsPurchased: 0,
+      needVisionPings: 0,
+      nexusKills: 0,
+      nexusLost: 0,
+      nexusTakedowns: 0,
+      objectivesStolen: 0,
+      objectivesStolenAssists: 0,
+      onMyWayPings: 0,
+      pushPings: 0,
+      retreatPings: 0,
+      spell1Casts: 0,
+      spell2Casts: 0,
+      spell3Casts: 0,
+      spell4Casts: 0,
+      summoner1Casts: 0,
+      summoner2Casts: 0,
+      totalAllyJungleMinionsKilled: stats.neutralMinionsKilledTeamJungle,
+      totalEnemyJungleMinionsKilled: stats.neutralMinionsKilledEnemyJungle,
+      visionClearedPings: 0,
+    }
   }
 
   // ==================== 好友 ====================
