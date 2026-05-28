@@ -338,7 +338,7 @@
   background: #0a0f16;
 }
 
-.sobp-body--kiwi {
+.sobp-body--compact {
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -351,31 +351,31 @@
   align-items: stretch;
 }
 
-.sobp-kiwi-layout {
+.sobp-compact-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
 
-.sobp-kiwi-layout .sobp-section {
+.sobp-compact-layout .sobp-section {
   min-height: 0;
 }
 
-.sobp-kiwi-layout .sobp-section-card {
+.sobp-compact-layout .sobp-section-card {
   min-height: 0;
 }
 
-.sobp-kiwi-trend,
-.sobp-kiwi-augments {
+.sobp-compact-trend,
+.sobp-compact-augments {
   min-width: 0;
 }
 
-.sobp-kiwi-trend .sobp-section-card {
+.sobp-compact-trend .sobp-section-card {
   padding: 10px 12px;
 }
 
-.sobp-kiwi-augments .sobp-section-card {
+.sobp-compact-augments .sobp-section-card {
   padding: 10px 12px;
 }
 

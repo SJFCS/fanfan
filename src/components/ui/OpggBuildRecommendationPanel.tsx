@@ -127,7 +127,8 @@ export function OpggBuildRecommendationPanel({
   const positionText = recommendation?.position ?? context.position
   const modeTags = [queueText, formatPositionText(positionText)].filter(Boolean).join(' · ')
   const isKiwi = isKiwiMode(context)
-  const showAugments = isKiwi || recommendation?.mode === 'arena'
+  const isCompactMode = isCompactModeContext(context, recommendation?.mode)
+  const showAugments = isCompactMode
 
   return (
     <div className="sobp">
@@ -156,14 +157,14 @@ export function OpggBuildRecommendationPanel({
         </div>
       </header>
 
-      <main className={`sobp-body${isKiwi ? ' sobp-body--kiwi' : ''}`}>
-        {isKiwi ? (
-          <div className="sobp-kiwi-layout">
-            <div className="sobp-kiwi-trend">
+      <main className={`sobp-body${isCompactMode ? ' sobp-body--compact' : ''}`}>
+        {isCompactMode ? (
+          <div className="sobp-compact-layout">
+            <div className="sobp-compact-trend">
               <LastItemTrendSection title={t('opgg.section.trends')} builds={recommendation?.lastItems} />
             </div>
-            <div className="sobp-kiwi-augments">
-              {showAugments && <AugmentSection title={t('opgg.section.augments')} groups={recommendation?.augments} winRateFirst />}
+            <div className="sobp-compact-augments">
+              {showAugments && <AugmentSection title={t('opgg.section.augments')} groups={recommendation?.augments} winRateFirst={isKiwi} />}
             </div>
           </div>
         ) : (
@@ -207,6 +208,17 @@ function TierFilterSelect({ value, onChange }: { value: OpggTier; onChange: (tie
 
 function isKiwiMode(context: RecommendationContext): boolean {
   return context.gameMode.toLowerCase() === 'kiwi'
+}
+
+function isCompactModeContext(context: RecommendationContext, mode?: OpggMode): boolean {
+  const gameMode = context.gameMode.toLowerCase()
+  return gameMode === 'aram'
+    || gameMode === 'kiwi'
+    || gameMode === 'cherry'
+    || gameMode === 'arena'
+    || gameMode === 'urf'
+    || gameMode === 'arurf'
+    || mode === 'arena'
 }
 
 function formatPositionText(position: OpggPosition): string {
