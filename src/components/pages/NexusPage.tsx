@@ -44,7 +44,36 @@ export function NexusPage() {
 
   return (
     <div className="sona-settings">
-      <SettingGroup title={t('tools.group.social')}>
+      <SettingGroup title={t('tools.group.socialFriendDisplay')}>
+        <SettingCard
+          title={t('tools.friendSmartGroup.title')}
+          description={t('tools.friendSmartGroup.description')}
+        >
+          <SonaSwitch
+            checked={friendSmartGroup}
+            onChange={(v) => { setFriendSmartGroup(v); store.set('friendSmartGroup', v) }}
+          />
+        </SettingCard>
+        <SettingCard
+          title={t('tools.enhancedFriendStatus.title')}
+          description={t('tools.enhancedFriendStatus.description')}
+        >
+          <SonaSwitch
+            checked={enhancedFriendGameStatus}
+            onChange={(v) => { setEnhancedFriendGameStatus(v); store.set('enhancedFriendGameStatus', v) }}
+          />
+        </SettingCard>
+        <SettingCard
+          title={t('tools.friendMatchHistory.title')}
+          description={t('tools.friendMatchHistory.description')}
+        >
+          <SonaSwitch
+            checked={friendMatchHistory}
+            onChange={(v) => { setFriendMatchHistory(v); store.set('friendMatchHistory', v) }}
+          />
+        </SettingCard>
+      </SettingGroup>
+      <SettingGroup title={t('tools.group.socialPersonalDisplay')}>
         <SettingCard
           title={t('tools.group.rankDisguise')}
           description={t('tools.rankDisguise.description')}
@@ -163,33 +192,6 @@ export function NexusPage() {
           <SonaSwitch
             checked={customBanner}
             onChange={(v) => { setCustomBanner(v); store.set('customBanner', v) }}
-          />
-        </SettingCard>
-        <SettingCard
-          title={t('tools.friendSmartGroup.title')}
-          description={t('tools.friendSmartGroup.description')}
-        >
-          <SonaSwitch
-            checked={friendSmartGroup}
-            onChange={(v) => { setFriendSmartGroup(v); store.set('friendSmartGroup', v) }}
-          />
-        </SettingCard>
-        <SettingCard
-          title={t('tools.enhancedFriendStatus.title')}
-          description={t('tools.enhancedFriendStatus.description')}
-        >
-          <SonaSwitch
-            checked={enhancedFriendGameStatus}
-            onChange={(v) => { setEnhancedFriendGameStatus(v); store.set('enhancedFriendGameStatus', v) }}
-          />
-        </SettingCard>
-        <SettingCard
-          title={t('tools.friendMatchHistory.title')}
-          description={t('tools.friendMatchHistory.description')}
-        >
-          <SonaSwitch
-            checked={friendMatchHistory}
-            onChange={(v) => { setFriendMatchHistory(v); store.set('friendMatchHistory', v) }}
           />
         </SettingCard>
       </SettingGroup>
