@@ -93,12 +93,59 @@ function ChampionPriorityCards({
   )
 }
 
+const AUTO_ACCEPT_DELAY_MIN_SECONDS = 0
+const AUTO_ACCEPT_DELAY_MAX_SECONDS = 15
+const AUTO_ACCEPT_DELAY_MS_PER_SECOND = 1000
+
+const autoAcceptDelayInputProps = {
+  type: 'number',
+  min: AUTO_ACCEPT_DELAY_MIN_SECONDS,
+  max: AUTO_ACCEPT_DELAY_MAX_SECONDS,
+  step: 0.1,
+  inputMode: 'decimal',
+  pattern: '[0-9]*\\.?[0-9]*',
+} as const
+
+function cleanAutoAcceptDelaySecondsInput(value: string): string {
+  const cleaned = value.replace(/[^\d.]/g, '')
+  const dotIndex = cleaned.indexOf('.')
+  const singleDotValue = dotIndex >= 0
+    ? cleaned.slice(0, dotIndex + 1) + cleaned.slice(dotIndex + 1).replace(/\./g, '')
+    : cleaned
+  const parsedValue = parseFloat(singleDotValue)
+
+  return Number.isFinite(parsedValue) && parsedValue > AUTO_ACCEPT_DELAY_MAX_SECONDS
+    ? String(AUTO_ACCEPT_DELAY_MAX_SECONDS)
+    : singleDotValue
+}
+
+function normalizeAutoAcceptDelaySeconds(value: string | number): number {
+  const parsedValue = typeof value === 'number' ? value : parseFloat(cleanAutoAcceptDelaySecondsInput(value))
+  if (!Number.isFinite(parsedValue)) return AUTO_ACCEPT_DELAY_MIN_SECONDS
+  return Math.min(AUTO_ACCEPT_DELAY_MAX_SECONDS, Math.max(AUTO_ACCEPT_DELAY_MIN_SECONDS, parsedValue))
+}
+
+function getAutoAcceptDelayMinSeconds(maxSeconds: number): number {
+  return maxSeconds - 1 < AUTO_ACCEPT_DELAY_MIN_SECONDS ? maxSeconds : maxSeconds - 1
+}
+
+function formatAutoAcceptDelaySecondsFromMs(value: number): string {
+  const delayMs = Number.isFinite(value) ? value : 0
+  const delaySeconds = normalizeAutoAcceptDelaySeconds(delayMs / AUTO_ACCEPT_DELAY_MS_PER_SECOND)
+  return String(Number(delaySeconds.toFixed(3)))
+}
+
+function setAutoAcceptDelayRangeByMaxSeconds(maxSeconds: number) {
+  const minSeconds = getAutoAcceptDelayMinSeconds(maxSeconds)
+  store.set('autoAcceptDelayMin', Math.round(minSeconds * AUTO_ACCEPT_DELAY_MS_PER_SECOND))
+  store.set('autoAcceptDelayMax', Math.round(maxSeconds * AUTO_ACCEPT_DELAY_MS_PER_SECOND))
+}
+
 export function AutomationPage() {
   const { t } = useI18n()
   const [autoAccept, setAutoAccept] = useState(store.get('autoAcceptMatch'))
   // 延迟值在 UI 里用字符串存，避免"删到空 → 变 NaN"、"输到一半"等中间态被推回 store
-  const [autoAcceptDelayMin, setAutoAcceptDelayMin] = useState(String(store.get('autoAcceptDelayMin')))
-  const [autoAcceptDelayMax, setAutoAcceptDelayMax] = useState(String(store.get('autoAcceptDelayMax')))
+  const [autoAcceptDelayMax, setAutoAcceptDelayMax] = useState(formatAutoAcceptDelaySecondsFromMs(store.get('autoAcceptDelayMax')))
   const [autoReturnToLobby, setAutoReturnToLobby] = useState(store.get('autoReturnToLobby'))
   const [autoMatchmaking, setAutoMatchmaking] = useState(store.get('autoMatchmaking'))
   const [autoMatchmakingMinimumMembers, setAutoMatchmakingMinimumMembers] = useState(String(store.get('autoMatchmakingMinimumMembers')))
@@ -130,8 +177,7 @@ export function AutomationPage() {
   useEffect(() => {
     const unsubs = [
       store.onChange('autoAcceptMatch', setAutoAccept),
-      store.onChange('autoAcceptDelayMin', (v) => setAutoAcceptDelayMin(String(v))),
-      store.onChange('autoAcceptDelayMax', (v) => setAutoAcceptDelayMax(String(v))),
+      store.onChange('autoAcceptDelayMax', (v) => setAutoAcceptDelayMax(formatAutoAcceptDelaySecondsFromMs(v))),
       store.onChange('autoReturnToLobby', setAutoReturnToLobby),
       store.onChange('autoMatchmaking', setAutoMatchmaking),
       store.onChange('autoMatchmakingMinimumMembers', (v) => setAutoMatchmakingMinimumMembers(String(v))),
@@ -294,51 +340,33 @@ export function AutomationPage() {
           title={t('tools.autoAccept.title')}
           description={t('tools.autoAccept.description')}
         >
+          {autoAccept && (
+            <div className="sona-auto-accept-delay-row">
+              <div className="sona-auto-accept-delay-input">
+                <SonaInput
+                  {...autoAcceptDelayInputProps}
+                  value={autoAcceptDelayMax}
+                  onChange={(v) => {
+                    const cleaned = cleanAutoAcceptDelaySecondsInput(v)
+                    const maxSeconds = normalizeAutoAcceptDelaySeconds(cleaned)
+                    setAutoAcceptDelayMax(cleaned)
+                    setAutoAcceptDelayRangeByMaxSeconds(maxSeconds)
+                  }}
+                  placeholder="最大"
+                />
+              </div>
+              <span className="sona-auto-accept-delay-unit">{t('tools.autoAcceptDelay.unit')}</span>
+            </div>
+          )}
           <SonaSwitch
             checked={autoAccept}
-            onChange={(v) => { setAutoAccept(v); store.set('autoAcceptMatch', v) }}
+            onChange={(v) => {
+              setAutoAccept(v)
+              if (v) setAutoAcceptDelayRangeByMaxSeconds(normalizeAutoAcceptDelaySeconds(autoAcceptDelayMax))
+              store.set('autoAcceptMatch', v)
+            }}
           />
         </SettingCard>
-        {autoAccept && (
-          <div className="sona-setting-switch-panel">
-            <div className="sona-setting-panel-section">
-              <SettingCard
-                title={t('tools.autoAcceptDelay.title')}
-                description={t('tools.autoAcceptDelay.description')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 80 }}>
-                    <SonaInput
-                      value={autoAcceptDelayMin}
-                      onChange={(v) => {
-                        // 毫秒只收整数
-                        const cleaned = v.replace(/[^\d]/g, '')
-                        setAutoAcceptDelayMin(cleaned)
-                        const n = parseInt(cleaned, 10)
-                        store.set('autoAcceptDelayMin', Number.isFinite(n) ? n : 0)
-                      }}
-                      placeholder="最小"
-                    />
-                  </div>
-                  <span style={{ color: '#a09b8c', fontSize: 13 }}>—</span>
-                  <div style={{ width: 80 }}>
-                    <SonaInput
-                      value={autoAcceptDelayMax}
-                      onChange={(v) => {
-                        const cleaned = v.replace(/[^\d]/g, '')
-                        setAutoAcceptDelayMax(cleaned)
-                        const n = parseInt(cleaned, 10)
-                        store.set('autoAcceptDelayMax', Number.isFinite(n) ? n : 0)
-                      }}
-                      placeholder="最大"
-                    />
-                  </div>
-                  <span style={{ color: '#a09b8c', fontSize: 13 }}>毫秒</span>
-                </div>
-              </SettingCard>
-            </div>
-          </div>
-        )}
         <SettingCard
           title={t('tools.autoHonor.title')}
           description={t('tools.autoHonor.description')}

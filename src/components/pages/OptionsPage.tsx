@@ -3,16 +3,25 @@ import { SettingCard, SettingGroup } from '@/components/ui/SettingCard'
 import { SonaSwitch } from '@/components/ui/SonaSwitch'
 import { SonaSelect } from '@/components/ui/SonaSelect'
 import { store } from '@/lib/store'
-import { useI18n, type SonaLocaleSetting } from '@/i18n'
+import { useI18n } from '@/i18n'
 import '@/styles/SettingsPage.css'
+import '@/styles/ConfigLockPage.css'
 import { lcu } from '@/lib/lcu'
 import { SonaButton } from '@/components/ui/SonaButton'
 import { SonaInput } from '@/components/ui/SonaInput'
 
 function BackupManager() {
+  const { t } = useI18n()
   const [backupName, setBackupName] = useState('')
   const [backups, setBackups] = useState<{ name: string; timestamp: number }[]>([])
   const [status, setStatus] = useState('')
+  const [settingsPath, setSettingsPath] = useState('')
+  const [loadingConfigPath, setLoadingConfigPath] = useState(false)
+  const [configPathError, setConfigPathError] = useState('')
+  const [configActionError, setConfigActionError] = useState('')
+  const [updatingConfigLock, setUpdatingConfigLock] = useState(false)
+  const [locked, setLocked] = useState(store.get('gameConfigLocked'))
+  const [configDetailsOpen, setConfigDetailsOpen] = useState(false)
 
   const refreshList = async () => {
     const list = await lcu.listBackups()
@@ -20,26 +29,100 @@ function BackupManager() {
   }
 
   useEffect(() => { refreshList() }, [])
+  useEffect(() => store.onChange('gameConfigLocked', setLocked), [])
+
+  const refreshConfigPath = async () => {
+    setLoadingConfigPath(true)
+    setConfigPathError('')
+    try {
+      setSettingsPath(await lcu.getGameSettingsFilePath())
+    } catch (err) {
+      setSettingsPath('')
+      setConfigPathError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoadingConfigPath(false)
+    }
+  }
+
+  const toggleConfigDetails = () => {
+    setConfigDetailsOpen((open) => {
+      const next = !open
+      if (next && !settingsPath && !configPathError && !loadingConfigPath) {
+        void refreshConfigPath()
+      }
+      return next
+    })
+  }
+
+  const toggleConfigLocked = async () => {
+    if (!Pengu.gameConfig) {
+      setConfigActionError(t('tools.configLock.unsupported'))
+      return
+    }
+
+    const next = !locked
+    setUpdatingConfigLock(true)
+    setConfigActionError('')
+
+    try {
+      if (next) {
+        await Pengu.gameConfig.lock()
+      } else {
+        await Pengu.gameConfig.unlock()
+      }
+      setLocked(next)
+      store.set('gameConfigLocked', next)
+    } catch (err) {
+      setConfigActionError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setUpdatingConfigLock(false)
+    }
+  }
 
   const handleBackup = async () => {
     const name = backupName.trim()
-    if (!name) { setStatus('❌ 请输入备份名称'); return }
-    setStatus('⏳ 备份中...')
+    if (!name) { setStatus(t('tools.backup.nameRequired')); return }
+    setStatus(t('tools.backup.saving'))
     const ok = await lcu.backupSettings(name)
-    setStatus(ok ? '✅ 备份成功' : '❌ 备份失败')
+    setStatus(ok ? t('tools.backup.success') : t('tools.backup.failed'))
     if (ok) { setBackupName(''); refreshList() }
   }
 
   const handleRestore = async (name: string) => {
-    setStatus(`⏳ 恢复 "${name}" 中...`)
+    setStatus(t('tools.backup.restoring', { name }))
+    const shouldRelock = Boolean(Pengu.gameConfig && store.get('gameConfigLocked'))
+
+    if (shouldRelock) {
+      try {
+        await Pengu.gameConfig!.unlock()
+        store.set('gameConfigLocked', false)
+        setLocked(false)
+      } catch (err) {
+        setStatus(err instanceof Error ? err.message : String(err))
+        return
+      }
+    }
+
     const ok = await lcu.restoreSettings(name)
-    setStatus(ok ? `✅ "${name}" 已恢复` : '❌ 恢复失败')
+
+    if (shouldRelock) {
+      try {
+        await Pengu.gameConfig!.lock()
+        store.set('gameConfigLocked', true)
+        setLocked(true)
+      } catch (err) {
+        setStatus(err instanceof Error ? err.message : String(err))
+        return
+      }
+    }
+
+    setStatus(ok ? t('tools.backup.restored', { name }) : t('tools.backup.restoreFailed'))
   }
 
   const handleDelete = async (name: string) => {
     const ok = await lcu.deleteBackup(name)
     if (ok) {
-      setStatus(`已删除 "${name}"`)
+      setStatus(t('tools.backup.deleted', { name }))
       refreshList()
     }
   }
@@ -52,36 +135,79 @@ function BackupManager() {
 
   return (
     <>
-      <div className="sona-debug-actions" style={{ alignItems: 'flex-end', gap: 8 }}>
-        <div style={{ flex: 1 }}>
-          <SonaInput
-            value={backupName}
-            onChange={(v) => { setBackupName(v); setStatus('') }}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleBackup() }}
-            placeholder="输入备份名称 (如: 排位设置)"
-          />
-        </div>
-        <SonaButton variant="primary" onClick={handleBackup}>
-          保存备份
-        </SonaButton>
-      </div>
-      {status && <p className="sona-subtitle" style={{ marginTop: 6 }}>{status}</p>}
-      {backups.length > 0 && (
-        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {backups.map((b) => (
-            <div key={b.name} className="sona-backup-item">
-              <div className="sona-backup-info">
-                <span className="sona-backup-name">{b.name}</span>
-                <span className="sona-backup-time">{formatTime(b.timestamp)}</span>
+      <div className="sona-config-lock-card">
+        <SettingCard
+          title={t('tools.group.configLock')}
+          description={t('tools.group.configLock.description')}
+        >
+          <SonaButton variant="secondary" onClick={toggleConfigDetails}>
+            {configDetailsOpen ? t('tools.configLock.collapse') : t('tools.configLock.details')}
+          </SonaButton>
+          <SonaButton variant={locked ? 'secondary' : 'primary'} onClick={toggleConfigLocked} disabled={updatingConfigLock}>
+            {updatingConfigLock ? t('tools.configLock.processing') : locked ? t('tools.configLock.unlock') : t('tools.configLock.lock')}
+          </SonaButton>
+        </SettingCard>
+
+        {configDetailsOpen && (
+          <div className="sona-config-path-panel sona-config-path-panel--nested">
+            <div className="sona-config-path-header">
+              <div>
+                <div className="sona-config-path-label">{t('tools.configLock.filePath.title')}</div>
+                <p>{t('tools.configLock.filePath.description')}</p>
               </div>
-              <div className="sona-backup-actions">
-                <SonaButton onClick={() => handleRestore(b.name)}>恢复</SonaButton>
-                <SonaButton onClick={() => handleDelete(b.name)}>删除</SonaButton>
-              </div>
+              <SonaButton variant="secondary" onClick={refreshConfigPath} disabled={loadingConfigPath}>
+                {t('tools.configLock.filePath.refresh')}
+              </SonaButton>
             </div>
-          ))}
-        </div>
-      )}
+            <div className={`sona-config-path-value${configPathError ? ' sona-config-path-value--error' : ''}`}>
+              {loadingConfigPath ? t('tools.configLock.filePath.loading') : configPathError || settingsPath || t('tools.configLock.filePath.empty')}
+            </div>
+          </div>
+        )}
+
+        {configActionError && (
+          <div className="sona-config-action-error">
+            {configActionError}
+          </div>
+        )}
+
+        <SettingCard
+          title={t('tools.group.backup')}
+          description={t('tools.backup.description')}
+        >
+          <div className="sona-backup-card-action">
+            <div className="sona-backup-card-input">
+              <SonaInput
+                value={backupName}
+                onChange={(v) => { setBackupName(v); setStatus('') }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleBackup() }}
+                placeholder={t('tools.backup.placeholder')}
+              />
+            </div>
+            <SonaButton variant="primary" onClick={handleBackup}>
+              {t('tools.backup.save')}
+            </SonaButton>
+          </div>
+          {status && <p className="sona-subtitle sona-backup-card-status">{status}</p>}
+        </SettingCard>
+
+        {backups.length > 0 && (
+          <div className="sona-backup-list">
+            {backups.map((b) => (
+              <div key={b.name} className="sona-backup-item">
+                <div className="sona-backup-info">
+                  <span className="sona-backup-name">{b.name}</span>
+                  <span className="sona-backup-time">{formatTime(b.timestamp)}</span>
+                </div>
+                <div className="sona-backup-actions">
+                  <SonaButton onClick={() => handleRestore(b.name)}>{t('common.restore')}</SonaButton>
+                  <SonaButton onClick={() => handleDelete(b.name)}>{t('common.delete')}</SonaButton>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </>
   )
 }
@@ -95,15 +221,10 @@ const hotkeyOptions = [
 ]
 
 export function OptionsPage() {
-  const { localeSetting, setLocaleSetting, t } = useI18n()
+  const { t } = useI18n()
   const [developerMode, setDeveloperMode] = useState(store.get('developerMode'))
   const [hotkey, setHotkey] = useState(store.get('hotkey'))
   const [globalParticle, setGlobalParticle] = useState(store.get('globalParticle'))
-  const localeOptions = [
-    { value: 'auto', label: t('settings.language.auto') },
-    { value: 'zh-CN', label: t('settings.language.zhCN') },
-    { value: 'en-US', label: t('settings.language.enUS') },
-  ]
 
   useEffect(() => {
     const unsubs = [
@@ -115,19 +236,11 @@ export function OptionsPage() {
 
   return (
     <div className="sona-settings">
-      <h2 className="sona-settings-title">{t('settings.title')}</h2>
+      <SettingGroup title={t('tools.group.backup')}>
+        <BackupManager />
+      </SettingGroup>
 
-      <SettingGroup title={t('settings.group.general')}>
-        <SettingCard
-          title={t('settings.language.title')}
-          description={t('settings.language.description')}
-        >
-          <SonaSelect
-            options={localeOptions}
-            value={localeSetting}
-            onChange={(v) => setLocaleSetting(v as SonaLocaleSetting)}
-          />
-        </SettingCard>
+      <SettingGroup title={t('settings.group.advanced')}>
         <SettingCard
           title={t('settings.hotkey.title')}
           description={t('settings.hotkey.description')}
@@ -138,14 +251,6 @@ export function OptionsPage() {
             onChange={(v) => { setHotkey(v); store.set('hotkey', v) }}
           />
         </SettingCard>
-      </SettingGroup>
-
-      <SettingGroup title={t('tools.group.backup')}>
-        <p className="sona-subtitle" style={{ marginBottom: 10 }}>{t('tools.backup.placeholder')}</p>
-        <BackupManager />
-      </SettingGroup>
-
-      <SettingGroup title={t('settings.group.advanced')}>
         <SettingCard
           title={t('settings.developerMode.title')}
           description={t('settings.developerMode.description')}

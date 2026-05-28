@@ -17,15 +17,39 @@
   width: 48px;
 }
 
-/* ---- Logo 区域 ---- */
 .sona-sidebar-logo {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 14px;
+  padding: 10px 10px;
   border-bottom: 1px solid rgba(200, 170, 110, 0.1);
   flex-shrink: 0;
-  min-height: 47px;
+  min-height: 50px;
+}
+
+.sona-sidebar-logo-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.sona-sidebar-logo-home:hover {
+  color: #f0e6d2;
+}
+
+.sona-sidebar-logo-home:active {
+  color: #c8aa6e;
 }
 
 .sona-sidebar-logo-icon {
@@ -36,13 +60,6 @@
   flex-shrink: 0;
   width: 20px;
   height: 20px;
-}
-
-.sona-sidebar-logo-title {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
 }
 
 .sona-sidebar-logo-text {
@@ -61,7 +78,57 @@
   white-space: nowrap;
 }
 
-/* ---- 导航列表 ---- */
+.sona-sidebar-lang-select {
+  width: 34px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.sona-sidebar-lang-select .sona-select-trigger {
+  padding: 4px;
+  min-height: 28px;
+  justify-content: center;
+  background: rgba(10, 20, 32, 0.92);
+  border-color: rgba(120, 90, 40, 0.75);
+  border-radius: 8px;
+}
+
+.sona-sidebar-lang-select .sona-select-value {
+  gap: 0;
+}
+
+.sona-sidebar-lang-select .sona-select-leading {
+  width: 18px;
+  height: 18px;
+}
+
+.sona-sidebar-lang-select .sona-select-arrow {
+  display: none;
+}
+
+.sona-sidebar-lang-select .sona-select-dropdown {
+  right: 0;
+  left: auto;
+  min-width: 130px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.sona-sidebar--collapsed .sona-sidebar-logo {
+  justify-content: center;
+  padding: 10px 6px;
+}
+
+.sona-sidebar--collapsed .sona-sidebar-logo-home {
+  justify-content: center;
+  width: 100%;
+}
+
+.sona-sidebar--collapsed .sona-sidebar-lang-select {
+  display: none;
+  margin-left: 0;
+}
+
 .sona-sidebar-nav {
   flex: 1;
   display: flex;
@@ -73,12 +140,10 @@
   min-height: 0;
 }
 
-/* 隐藏滚动条 */
 .sona-sidebar-nav::-webkit-scrollbar {
   width: 0;
 }
 
-/* ---- 导航项 ---- */
 .sona-sidebar-item {
   display: flex;
   align-items: center;
@@ -143,18 +208,11 @@
   text-overflow: ellipsis;
 }
 
-/* 收缩状态下导航项居中 */
 .sona-sidebar--collapsed .sona-sidebar-item {
   justify-content: center;
   padding: 8px;
 }
 
-.sona-sidebar--collapsed .sona-sidebar-logo {
-  justify-content: center;
-  padding: 14px 0;
-}
-
-/* ---- 底部按钮区 ---- */
 .sona-sidebar-footer {
   display: flex;
   justify-content: center;

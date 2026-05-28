@@ -183,3 +183,13 @@ export function GitHubIcon() {
     </svg>
   )
 }
+
+export function TranslateIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9.2" />
+      <path d="M12 2.8a13 13 0 0 0 0 18.4 13 13 0 0 0 0-18.4" />
+      <path d="M2.8 12h18.4" />
+    </svg>
+  )
+}

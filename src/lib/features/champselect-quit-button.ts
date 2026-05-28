@@ -121,8 +121,8 @@ function showConfirmDialog(onConfirm: () => void) {
     if (e.target === overlay) close()
   })
 
-  btnRow.appendChild(cancelBtn)
   btnRow.appendChild(confirmBtn)
+  btnRow.appendChild(cancelBtn)
   dialog.appendChild(btnRow)
   overlay.appendChild(dialog)
   document.body.appendChild(overlay)

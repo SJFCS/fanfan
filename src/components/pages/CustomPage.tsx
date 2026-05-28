@@ -11,7 +11,6 @@ import { store } from '@/lib/store'
 import { useI18n } from '@/i18n'
 import '@/styles/SettingsPage.css'
 import { SonaSelect } from '@/components/ui/SonaSelect'
-import { logger } from '@/index'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp', 'ico'])
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'ogg', 'ogv', 'mov', 'm4v'])
@@ -882,32 +881,10 @@ export function CustomPage() {
     const assetPath = event.dataTransfer.getData('text/plain')
     addCustomAvatarAssetPath(assetPath)
   }
-  const effectOptions = [
-    { value: 'none', label: t('option.windowEffect.none') },
-    { value: 'blurbehind', label: t('option.windowEffect.blurbehind') },
-    { value: 'acrylic', label: t('option.windowEffect.acrylic') },
-    { value: 'unified', label: t('option.windowEffect.unified') },
-    { value: 'mica', label: t('option.windowEffect.mica') },
-    { value: 'transparent', label: t('option.windowEffect.transparent') },
-  ]
-
   const [gameModeFilter, setGameModeFilter] = useState(store.get('gameModeFilter'))
   const [hideTFT, setHideTFT] = useState(store.get('hideTFT'))
   const [hideRightNavText, setHideRightNavText] = useState(store.get('hideRightNavText'))
-  const [windowEffect, setWindowEffect] = useState(store.get('windowEffect'))
   const [unlockChromas, setUnlockChromas] = useState(store.get('unlockChromas'))
-
-  const handleEffectChange = (value: string) => {
-    setWindowEffect(value)
-    store.set('windowEffect', value)
-    if (value === 'none') {
-      Effect.clear()
-      logger.info('Window effect cleared')
-    } else {
-      Effect.apply(value as 'acrylic', { color: '#0006' })
-      logger.info('Window effect applied: %s', value)
-    }
-  }
 
   const [globalParticle, setGlobalParticle] = useState(store.get('globalParticle'))
     useEffect(() => {
@@ -927,65 +904,156 @@ export function CustomPage() {
       <SettingGroup title={t('beautify.group.client')}>
 
         <SettingCard
-          title={t('tools.gameModeFilter.title')}
-          description={t('tools.gameModeFilter.description')}        
+          title={t('beautify.avatarMode.title')}
+          description={t('beautify.avatarMode.description')}
         >
           <SonaSwitch
-            checked={gameModeFilter}
-            onChange={(v) => { setGameModeFilter(v); store.set('gameModeFilter', v) }}
+            checked={customAvatarMode}
+            onChange={toggleCustomAvatarMode}
           />
         </SettingCard>
-        <SettingCard
-          title={t('tools.unlockChromas.title')}
-          description={t('tools.unlockChromas.description')}        
-        >
-          <SonaSwitch
-            checked={unlockChromas}
-            onChange={(v) => { setUnlockChromas(v); store.set('unlockChromas', v) }}
-          />
-        </SettingCard>        
-        <SettingCard
-          title={t('tools.hideTFT.title')}
-          description={t('tools.hideTFT.description')}
-        >
-          <SonaSwitch
-            checked={hideTFT}
-            onChange={(v) => { setHideTFT(v); store.set('hideTFT', v) }}
-          />
-        </SettingCard>
-        <SettingCard
-          title={t('tools.hideRightNavText.title')}
-          description={t('tools.hideRightNavText.description')}
-        >
-          <SonaSwitch
-            checked={hideRightNavText}
-            onChange={(v) => { setHideRightNavText(v); store.set('hideRightNavText', v) }}
-          />
-        </SettingCard>     
-        <SettingCard
-          title={t('tools.windowEffect.title')}
-          description={t('tools.windowEffect.description')}
-        >
-          <div style={{ minWidth: 130 }}>
-            <SonaSelect
-              options={effectOptions}
-              value={windowEffect}
-              onChange={handleEffectChange}
-            />
-          </div>
-        </SettingCard>
-        <SettingCard
-          title={t('settings.globalParticle.title')}
-          description={t('settings.globalParticle.description')}
-        >
-          <SonaSwitch
-            checked={globalParticle}
-            onChange={(v) => { setGlobalParticle(v); store.set('globalParticle', v) }}
-          />
-        </SettingCard>             
-      </SettingGroup>
+        {customAvatarMode && (
+          <div className="sona-setting-switch-panel">
+            <div className="sona-setting-panel-section">
+              <div
+                className={[
+                  'sona-avatar-dropzone',
+                  customAvatarAssetPaths.length === 0 ? 'sona-avatar-dropzone--empty' : '',
+                  isAvatarDropActive ? 'sona-avatar-dropzone--active' : '',
+                ].filter(Boolean).join(' ')}
+                onDragOver={handleAvatarDragOver}
+                onDragLeave={handleAvatarDragLeave}
+                onDrop={handleAvatarDrop}
+              >
+                {customAvatarAssetPaths.length > 0 ? (
+                  <div className="sona-avatar-grid">
+                    {customAvatarAssetPaths.map((assetPath) => {
+                      const isApplied = (customAvatarActiveAssetPath ?? customAvatarAssetPaths[0]) === assetPath
+                      const adjustment = customAvatarAdjustments[assetPath] ?? DEFAULT_AVATAR_ADJUSTMENT
 
-      <SettingGroup title={t('beautify.group.wallpaper')}>
+                      return (
+                        <div
+                          className={[
+                            'sona-avatar-card',
+                            isApplied ? 'sona-avatar-card--applied' : '',
+                          ].filter(Boolean).join(' ')}
+                          key={assetPath}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => applyCustomAvatarAssetPath(assetPath)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              applyCustomAvatarAssetPath(assetPath)
+                            }
+                          }}
+                          aria-label={`${t('common.apply')} ${assetPath}`}
+                        >
+                          <button
+                            className="sona-asset-card-remove"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              removeCustomAvatarAssetPath(assetPath)
+                            }}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            aria-label={`${t('common.remove')} ${assetPath}`}
+                          >
+                            ×
+                          </button>
+                          <button
+                            className="sona-wallpaper-card-edit"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              openCustomAvatarAdjustModal(assetPath)
+                            }}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            aria-label={`${t('beautify.wallpaper.adjust')} ${assetPath}`}
+                          >
+                            {t('beautify.wallpaper.adjust')}
+                          </button>
+                          <div className="sona-avatar-card-preview">
+                            <div
+                              className="sona-avatar-preview-stage"
+                              style={getAvatarPreviewStageStyle(assetPath, adjustment)}
+                            >
+                              <img
+                                src={getAssetUrl(assetPath, 'avatars')}
+                                alt={assetPath}
+                                onLoad={(event) => updateAvatarImageSize(assetPath, event.currentTarget)}
+                              />
+                            </div>
+                          </div>
+                          <span className="sona-avatar-card-name">{assetPath}</span>
+                          <span className="sona-avatar-card-action">{t('beautify.wallpaper.clickApply')}</span>
+                        </div>
+                      )
+                    })}
+                    <button
+                      className="sona-wallpaper-add-card"
+                      type="button"
+                      onClick={() => setShowAvatarInput((show) => !show)}
+                      aria-label={showAvatarInput ? t('common.cancel') : t('beautify.assets.add')}
+                    >
+                      <span
+                        className={[
+                          'sona-wallpaper-add-card-plus',
+                          showAvatarInput ? 'sona-wallpaper-add-mark--minus' : '',
+                        ].filter(Boolean).join(' ')}
+                        aria-hidden="true"
+                      />
+                      <span>{showAvatarInput ? t('common.cancel') : t('beautify.assets.add')}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="sona-avatar-dropzone-placeholder">
+                    <button
+                      className="sona-wallpaper-add-trigger"
+                      type="button"
+                      onClick={() => setShowAvatarInput((show) => !show)}
+                      aria-label={showAvatarInput ? t('common.cancel') : t('beautify.assets.add')}
+                    >
+                      <span
+                        className={showAvatarInput ? 'sona-wallpaper-add-mark--minus' : ''}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <div>{showAvatarInput ? t('common.cancel') : t('beautify.avatar.dropHint')}</div>
+                  </div>
+                )}
+              </div>
+              {showAvatarInput && (
+                <SettingCard
+                  title={t('beautify.avatar.inputTitle')}
+                  description={t('beautify.avatar.inputDescription')}
+                >
+                  <div className="sona-wallpaper-add-form">
+                    <div className="sona-asset-path-row">
+                      <SonaInput
+                        value={assetPathInput}
+                        onChange={setAssetPathInput}
+                        placeholder={t('beautify.assets.examplePlaceholder')}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') addCustomAvatarInputPath()
+                        }}
+                      />
+                      <SonaButton onClick={addCustomAvatarInputPath}>
+                        {t('beautify.assets.add')}
+                      </SonaButton>
+                      <SonaButton onClick={() => window.openPluginsFolder(getPluginAssetsFolderPath('avatars'))}>
+                        {t('beautify.assets.openFolder')}
+                      </SonaButton>
+                    </div>
+                    <p className="sona-asset-browser-status">{assetMessage}</p>
+                  </div>
+                </SettingCard>
+              )}
+            </div>
+          </div>
+        )}
+
+
         <SettingCard
           title={t('beautify.wallpaperMode.title')}
           description={t('beautify.wallpaperMode.description')}
@@ -1193,158 +1261,56 @@ export function CustomPage() {
             </div>
           </div>
         )}
-      </SettingGroup>
-
-      <SettingGroup title={t('beautify.group.avatar')}>
         <SettingCard
-          title={t('beautify.avatarMode.title')}
-          description={t('beautify.avatarMode.description')}
+          title={t('settings.globalParticle.title')}
+          description={t('settings.globalParticle.description')}
         >
           <SonaSwitch
-            checked={customAvatarMode}
-            onChange={toggleCustomAvatarMode}
+            checked={globalParticle}
+            onChange={(v) => { setGlobalParticle(v); store.set('globalParticle', v) }}
+          />
+        </SettingCard>          
+      </SettingGroup>
+
+      <SettingGroup title={t('beautify.group.ui')}>
+
+        <SettingCard
+          title={t('tools.gameModeFilter.title')}
+          description={t('tools.gameModeFilter.description')}        
+        >
+          <SonaSwitch
+            checked={gameModeFilter}
+            onChange={(v) => { setGameModeFilter(v); store.set('gameModeFilter', v) }}
           />
         </SettingCard>
-        {customAvatarMode && (
-          <div className="sona-setting-switch-panel">
-            <div className="sona-setting-panel-section">
-              <div
-                className={[
-                  'sona-avatar-dropzone',
-                  customAvatarAssetPaths.length === 0 ? 'sona-avatar-dropzone--empty' : '',
-                  isAvatarDropActive ? 'sona-avatar-dropzone--active' : '',
-                ].filter(Boolean).join(' ')}
-                onDragOver={handleAvatarDragOver}
-                onDragLeave={handleAvatarDragLeave}
-                onDrop={handleAvatarDrop}
-              >
-                {customAvatarAssetPaths.length > 0 ? (
-                  <div className="sona-avatar-grid">
-                    {customAvatarAssetPaths.map((assetPath) => {
-                      const isApplied = (customAvatarActiveAssetPath ?? customAvatarAssetPaths[0]) === assetPath
-                      const adjustment = customAvatarAdjustments[assetPath] ?? DEFAULT_AVATAR_ADJUSTMENT
-
-                      return (
-                        <div
-                          className={[
-                            'sona-avatar-card',
-                            isApplied ? 'sona-avatar-card--applied' : '',
-                          ].filter(Boolean).join(' ')}
-                          key={assetPath}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => applyCustomAvatarAssetPath(assetPath)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault()
-                              applyCustomAvatarAssetPath(assetPath)
-                            }
-                          }}
-                          aria-label={`${t('common.apply')} ${assetPath}`}
-                        >
-                          <button
-                            className="sona-asset-card-remove"
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              removeCustomAvatarAssetPath(assetPath)
-                            }}
-                            onKeyDown={(event) => event.stopPropagation()}
-                            aria-label={`${t('common.remove')} ${assetPath}`}
-                          >
-                            ×
-                          </button>
-                          <button
-                            className="sona-wallpaper-card-edit"
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              openCustomAvatarAdjustModal(assetPath)
-                            }}
-                            onKeyDown={(event) => event.stopPropagation()}
-                            aria-label={`${t('beautify.wallpaper.adjust')} ${assetPath}`}
-                          >
-                            {t('beautify.wallpaper.adjust')}
-                          </button>
-                          <div className="sona-avatar-card-preview">
-                            <div
-                              className="sona-avatar-preview-stage"
-                              style={getAvatarPreviewStageStyle(assetPath, adjustment)}
-                            >
-                              <img
-                                src={getAssetUrl(assetPath, 'avatars')}
-                                alt={assetPath}
-                                onLoad={(event) => updateAvatarImageSize(assetPath, event.currentTarget)}
-                              />
-                            </div>
-                          </div>
-                          <span className="sona-avatar-card-name">{assetPath}</span>
-                          <span className="sona-avatar-card-action">{t('beautify.wallpaper.clickApply')}</span>
-                        </div>
-                      )
-                    })}
-                    <button
-                      className="sona-wallpaper-add-card"
-                      type="button"
-                      onClick={() => setShowAvatarInput((show) => !show)}
-                      aria-label={showAvatarInput ? t('common.cancel') : t('beautify.assets.add')}
-                    >
-                      <span
-                        className={[
-                          'sona-wallpaper-add-card-plus',
-                          showAvatarInput ? 'sona-wallpaper-add-mark--minus' : '',
-                        ].filter(Boolean).join(' ')}
-                        aria-hidden="true"
-                      />
-                      <span>{showAvatarInput ? t('common.cancel') : t('beautify.assets.add')}</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="sona-avatar-dropzone-placeholder">
-                    <button
-                      className="sona-wallpaper-add-trigger"
-                      type="button"
-                      onClick={() => setShowAvatarInput((show) => !show)}
-                      aria-label={showAvatarInput ? t('common.cancel') : t('beautify.assets.add')}
-                    >
-                      <span
-                        className={showAvatarInput ? 'sona-wallpaper-add-mark--minus' : ''}
-                        aria-hidden="true"
-                      />
-                    </button>
-                    <div>{showAvatarInput ? t('common.cancel') : t('beautify.avatar.dropHint')}</div>
-                  </div>
-                )}
-              </div>
-              {showAvatarInput && (
-                <SettingCard
-                  title={t('beautify.avatar.inputTitle')}
-                  description={t('beautify.avatar.inputDescription')}
-                >
-                  <div className="sona-wallpaper-add-form">
-                    <div className="sona-asset-path-row">
-                      <SonaInput
-                        value={assetPathInput}
-                        onChange={setAssetPathInput}
-                        placeholder={t('beautify.assets.examplePlaceholder')}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') addCustomAvatarInputPath()
-                        }}
-                      />
-                      <SonaButton onClick={addCustomAvatarInputPath}>
-                        {t('beautify.assets.add')}
-                      </SonaButton>
-                      <SonaButton onClick={() => window.openPluginsFolder(getPluginAssetsFolderPath('avatars'))}>
-                        {t('beautify.assets.openFolder')}
-                      </SonaButton>
-                    </div>
-                    <p className="sona-asset-browser-status">{assetMessage}</p>
-                  </div>
-                </SettingCard>
-              )}
-            </div>
-          </div>
-        )}
+        <SettingCard
+          title={t('tools.unlockChromas.title')}
+          description={t('tools.unlockChromas.description')}        
+        >
+          <SonaSwitch
+            checked={unlockChromas}
+            onChange={(v) => { setUnlockChromas(v); store.set('unlockChromas', v) }}
+          />
+        </SettingCard>        
+        <SettingCard
+          title={t('tools.hideTFT.title')}
+          description={t('tools.hideTFT.description')}
+        >
+          <SonaSwitch
+            checked={hideTFT}
+            onChange={(v) => { setHideTFT(v); store.set('hideTFT', v) }}
+          />
+        </SettingCard>
+        <SettingCard
+          title={t('tools.hideRightNavText.title')}
+          description={t('tools.hideRightNavText.description')}
+        >
+          <SonaSwitch
+            checked={hideRightNavText}
+            onChange={(v) => { setHideRightNavText(v); store.set('hideRightNavText', v) }}
+          />
+        </SettingCard>     
+      
       </SettingGroup>
 
       <Modal

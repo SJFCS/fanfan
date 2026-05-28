@@ -23,36 +23,6 @@ export function NexusPage() {
   const [rankQueue, setRankQueue] = useState(store.get('rankQueue'))
   const [rankTier, setRankTier] = useState(store.get('rankTier'))
   const [rankDivision, setRankDivision] = useState(store.get('rankDivision'))
-  const [removingChallengeTokens, setRemovingChallengeTokens] = useState(false)
-  const [clearingEmotes, setClearingEmotes] = useState(false)
-
-  const handleRemoveChallengeTokens = async () => {
-    if (removingChallengeTokens) return
-
-    setRemovingChallengeTokens(true)
-    try {
-      await lcu.removeChallengeTokens()
-      logger.info('挑战勋章已卸下')
-    } catch (err) {
-      logger.error('卸下挑战勋章失败:', err)
-    } finally {
-      setRemovingChallengeTokens(false)
-    }
-  }
-
-  const handleClearEmotes = async () => {
-    if (clearingEmotes) return
-
-    setClearingEmotes(true)
-    try {
-      await lcu.clearEmotes()
-      logger.info('表情已全部卸下')
-    } catch (err) {
-      logger.error('卸下表情失败:', err)
-    } finally {
-      setClearingEmotes(false)
-    }
-  }
 
   useEffect(() => {
     const unsubs = [
@@ -74,10 +44,10 @@ export function NexusPage() {
 
   return (
     <div className="sona-settings">
-      <SettingGroup title="社交">
+      <SettingGroup title={t('tools.group.social')}>
         <SettingCard
-          title="段位伪装"
-          description="伪装好友列表中显示的段位信息，仅影响聊天名片展示，不影响生涯页面。(好友可见)"
+          title={t('tools.group.rankDisguise')}
+          description={t('tools.rankDisguise.description')}
         >
           <SonaSwitch
             checked={rankDisguise}
@@ -166,8 +136,8 @@ export function NexusPage() {
           <div className="sona-setting-switch-panel">
             <div className="sona-setting-panel-section">
               <SettingCard
-                title="尝试锁定隐身状态"
-                description="切换为隐身后，如果客户端自动回退到离开或在线，会立即尝试改回隐身。"
+                title={t('tools.lockOfflineStatus.title')}
+                description={t('tools.lockOfflineStatus.description')}
               >
                 <SonaSwitch
                   checked={lockOfflineStatus}
@@ -177,56 +147,6 @@ export function NexusPage() {
             </div>
           </div>
         )}
-        <SettingCard
-          title={t('tools.removeCrest.title')}
-          description={t('tools.removeCrest.description')}
-        >
-          <SonaButton onClick={async () => {
-            try {
-              await fetch('/lol-regalia/v2/current-summoner/regalia', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ preferredCrestType: 'prestige', preferredBannerType: 'blank', selectedPrestigeCrest: 0 }),
-              })
-              logger.info('头像边框已卸下 ✓')
-            } catch (err) {
-              logger.error('卸下头像边框失败:', err)
-            }
-          }}>
-            {t('tools.unequip')}
-          </SonaButton>
-        </SettingCard>
-        <SettingCard
-          title={t('tools.removeIcon.title')}
-          description={t('tools.removeIcon.description')}
-        >
-          <SonaButton onClick={async () => {
-            try {
-              await lcu.setProfileIcon(29)
-              logger.info('头像已恢复为默认头像 ✓')
-            } catch (err) {
-              logger.error('恢复默认头像失败:', err)
-            }
-          }}>
-            {t('tools.unequip')}
-          </SonaButton>
-        </SettingCard>
-        <SettingCard
-          title={t('tools.removeChallengeTokens.title')}
-          description={t('tools.removeChallengeTokens.description')}
-        >
-          <SonaButton onClick={handleRemoveChallengeTokens} disabled={removingChallengeTokens}>
-            {removingChallengeTokens ? t('common.loading') : t('tools.unequip')}
-          </SonaButton>
-        </SettingCard>
-        <SettingCard
-          title={t('tools.clearEmotes.title')}
-          description={t('tools.clearEmotes.description')}
-        >
-          <SonaButton onClick={handleClearEmotes} disabled={clearingEmotes}>
-            {clearingEmotes ? t('common.loading') : t('tools.unequip')}
-          </SonaButton>
-        </SettingCard>
         <SettingCard
           title={t('tools.customProfileBg.title')}
           description={t('tools.customProfileBg.description')}
@@ -264,8 +184,8 @@ export function NexusPage() {
           />
         </SettingCard>
         <SettingCard
-          title="好友栏战绩快捷查询"
-          description="好友列表头像右上角显示快捷入口，点击即可打开该好友近期战绩。"
+          title={t('tools.friendMatchHistory.title')}
+          description={t('tools.friendMatchHistory.description')}
         >
           <SonaSwitch
             checked={friendMatchHistory}

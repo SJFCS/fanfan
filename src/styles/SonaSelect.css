@@ -44,6 +44,15 @@
   white-space: nowrap;
 }
 
+.sona-select-leading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+}
+
 .sona-select-icon {
   width: 18px;
   height: 18px;

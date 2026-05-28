@@ -17,7 +17,7 @@ import { AboutPage } from '@/components/pages/AboutPage'
 import { DebugPage } from '@/components/pages/DebugPage'
 import { UpdatePage } from '@/components/pages/UpdatePage'
 import { AutoClaimPage } from '@/components/pages/AutoClaimPage'
-import { HomeIcon, GamepadIcon, PaletteIcon, SettingsIcon, InfoIcon, BugIcon, ZapIcon, EnhanceIcon, AutomationIcon, NexusIcon, UpdateIcon, RewardIcon } from '@/components/ui/icons'
+import { GamepadIcon, PaletteIcon, SettingsIcon, InfoIcon, BugIcon, ZapIcon, EnhanceIcon, AutomationIcon, NexusIcon, UpdateIcon, RewardIcon } from '@/components/ui/icons'
 import { onModalVisibilityChange, isModalVisible, closeModal } from '@/lib/modal'
 import { store } from '@/lib/store'
 import { getUpdateState, onUpdateStateChange, type UpdateState } from '@/lib/update-checker'
@@ -25,13 +25,12 @@ import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 
 const baseSidebarItemConfigs: Array<Omit<SidebarItem, 'label'> & { labelKey: TranslationKey }> = [
-  { id: 'home', icon: <HomeIcon />, labelKey: 'nav.home' },
   { id: 'enhance', icon: <EnhanceIcon />, labelKey: 'nav.enhance' },
   { id: 'automation', icon: <AutomationIcon />, labelKey: 'nav.automation' },
-  { id: 'auto-claim', icon: <RewardIcon />, labelKey: 'nav.autoClaim' },
   { id: 'nexus', icon: <NexusIcon />, labelKey: 'nav.nexus' },  
   { id: 'custom', icon: <PaletteIcon />, labelKey: 'nav.custom' },
   { id: 'toolkit', icon: <GamepadIcon />, labelKey: 'nav.toolkit' },
+  { id: 'auto-claim', icon: <RewardIcon />, labelKey: 'nav.autoClaim' },
   { id: 'options', icon: <SettingsIcon />, labelKey: 'nav.options' },
   // { id: 'tools', icon: <GamepadIcon />, labelKey: 'nav.tools' },
   // { id: 'beautify', icon: <PaletteIcon />, labelKey: 'nav.beautify' },
@@ -162,6 +161,7 @@ export function App() {
           onSelect={setActivePageId}
           collapsed={sidebarCollapsed}
           onToggle={handleToggleSidebar}
+          onHomeClick={() => setActivePageId('home')}
         />
         <div className="sona-content">
           <PageContent pageId={activePageId} />

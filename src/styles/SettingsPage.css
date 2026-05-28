@@ -39,6 +39,70 @@
   gap: 8px;
 }
 
+.sona-setting-card:has(.sona-toolkit-card-action) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.sona-setting-card:has(.sona-toolkit-card-action) .sona-setting-card-action {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.sona-toolkit-card-action {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.sona-toolkit-card-input {
+  flex: 1 1 260px;
+  min-width: min(100%, 220px);
+}
+
+.sona-toolkit-card-status {
+  flex-basis: 100%;
+  width: 100%;
+  margin: 2px 0 0;
+  text-align: right;
+}
+
+.sona-setting-card:has(.sona-backup-card-action) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.sona-setting-card:has(.sona-backup-card-action) .sona-setting-card-action {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.sona-backup-card-action {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.sona-backup-card-input {
+  flex: 1 1 260px;
+  min-width: min(100%, 220px);
+}
+
+.sona-backup-card-status {
+  flex-basis: 100%;
+  width: 100%;
+  margin: 2px 0 0;
+  text-align: right;
+}
+
 .sona-spectate-friends {
   display: flex;
   flex-wrap: wrap;
@@ -204,6 +268,26 @@
   flex-shrink: 0;
   min-width: 72px;
   white-space: nowrap;
+}
+
+.sona-auto-accept-delay-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.sona-auto-accept-delay-input {
+  width: 86px;
+  flex: 0 0 86px;
+}
+
+.sona-auto-accept-delay-unit {
+  flex: 0 0 auto;
+  color: #a09b8c;
+  font-size: 13px;
 }
 
 .sona-wallpaper-add-form {
@@ -1078,25 +1162,35 @@
 }
 
 /* ---- 设置备份列表 ---- */
+.sona-backup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
 .sona-backup-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: rgba(30, 35, 40, 0.4);
-  border: 1px solid rgba(200, 170, 110, 0.1);
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(1, 10, 19, 0.28);
+  border: 1px solid rgba(60, 46, 22, 0.45);
   border-radius: 4px;
-  transition: border-color 0.2s;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .sona-backup-item:hover {
-  border-color: rgba(200, 170, 110, 0.25);
+  background: rgba(9, 20, 40, 0.58);
+  border-color: rgba(200, 170, 110, 0.36);
 }
 
 .sona-backup-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .sona-backup-name {
@@ -1112,5 +1206,8 @@
 
 .sona-backup-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+  flex-shrink: 0;
 }

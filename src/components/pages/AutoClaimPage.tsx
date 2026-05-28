@@ -9,6 +9,7 @@ import {
   getClaimableEventHubEvents,
   getClaimableMissions,
   getClaimableRewardGrants,
+  type ClaimableLocalizedText,
   type ClaimableEventHubEvent,
   type ClaimableMission,
   type ClaimableRewardGroup,
@@ -51,14 +52,14 @@ function RewardPreview({ items }: { items: ClaimableRewardItem[] }) {
   )
 }
 
-function RewardGroupPreview({ groups }: { groups?: ClaimableRewardGroup[] }) {
+function RewardGroupPreview({ groups, t }: { groups?: ClaimableRewardGroup[]; t: ReturnType<typeof useI18n>['t'] }) {
   if (!groups?.length) return null
 
   return (
     <div className="sona-claim-reward-groups">
       {groups.map((group) => (
         <div className="sona-claim-reward-group" key={group.id}>
-          <div className="sona-claim-reward-group-title">{group.title}</div>
+          <div className="sona-claim-reward-group-title">{group.titleI18n ? t(group.titleI18n.key, group.titleI18n.params) : group.title}</div>
           <RewardPreview items={group.items} />
         </div>
       ))}
@@ -66,7 +67,7 @@ function RewardGroupPreview({ groups }: { groups?: ClaimableRewardGroup[] }) {
   )
 }
 
-interface ClaimSectionProps<T extends { sonaTitle: string; sonaItems: ClaimableRewardItem[]; sonaGroups?: ClaimableRewardGroup[] }> {
+interface ClaimSectionProps<T extends { sonaTitle: string; sonaTitleI18n?: ClaimableLocalizedText; sonaItems: ClaimableRewardItem[]; sonaGroups?: ClaimableRewardGroup[] }> {
   title: string
   hint?: string
   kind: ClaimKind
@@ -91,7 +92,7 @@ interface ClaimSectionProps<T extends { sonaTitle: string; sonaItems: ClaimableR
   }
 }
 
-function ClaimSection<T extends { id?: string; info?: { id?: string }; sonaTitle: string; sonaItems: ClaimableRewardItem[]; sonaGroups?: ClaimableRewardGroup[] }>({
+function ClaimSection<T extends { id?: string; info?: { id?: string }; sonaTitle: string; sonaTitleI18n?: ClaimableLocalizedText; sonaItems: ClaimableRewardItem[]; sonaGroups?: ClaimableRewardGroup[] }>({
   title,
   hint,
   kind,
@@ -107,6 +108,7 @@ function ClaimSection<T extends { id?: string; info?: { id?: string }; sonaTitle
   message,
   text,
 }: ClaimSectionProps<T>) {
+  const { t } = useI18n()
   const allChecked = rows.length > 0 && rows.every((row) => selectedIds.has(row.info?.id ?? row.id ?? ''))
 
   return (
@@ -154,8 +156,8 @@ function ClaimSection<T extends { id?: string; info?: { id?: string }; sonaTitle
                   disabled={loading || claiming}
                 />
                 <div className="sona-claim-row-main">
-                  <strong>{row.sonaTitle}</strong>
-                  {row.sonaGroups?.length ? <RewardGroupPreview groups={row.sonaGroups} /> : <RewardPreview items={row.sonaItems} />}
+                  <strong>{row.sonaTitleI18n ? t(row.sonaTitleI18n.key, row.sonaTitleI18n.params) : row.sonaTitle}</strong>
+                  {row.sonaGroups?.length ? <RewardGroupPreview groups={row.sonaGroups} t={t} /> : <RewardPreview items={row.sonaItems} />}
                 </div>
               </div>
             )

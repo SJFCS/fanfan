@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { useI18n } from '@/i18n'
 import '@/styles/SonaSelect.css'
 
@@ -13,9 +13,22 @@ export interface SonaSelectProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  className?: string
+  ariaLabel?: string
+  leadingIcon?: ReactNode
+  iconOnly?: boolean
 }
 
-export function SonaSelect({ options, value, onChange, placeholder = '请选择...' }: SonaSelectProps) {
+export function SonaSelect({
+  options,
+  value,
+  onChange,
+  placeholder = '请选择...',
+  className,
+  ariaLabel,
+  leadingIcon,
+  iconOnly = false,
+}: SonaSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { t } = useI18n()
@@ -29,20 +42,27 @@ export function SonaSelect({ options, value, onChange, placeholder = '请选择.
         setIsOpen(false)
       }
     }
+
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   return (
-    <div className="sona-select" ref={dropdownRef}>
+    <div className={`sona-select${className ? ` ${className}` : ''}`} ref={dropdownRef}>
       <button
         className={`sona-select-trigger${isOpen ? ' sona-select-trigger--open' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
         type="button"
+        aria-label={ariaLabel}
       >
         <span className="sona-select-value">
-          {selectedOption?.icon && <img className="sona-select-icon" src={selectedOption.icon} alt="" />}
-          {selectedOption ? selectedOption.label : displayPlaceholder}
+          {leadingIcon && <span className="sona-select-leading">{leadingIcon}</span>}
+          {!iconOnly && (
+            <>
+              {selectedOption?.icon && <img className="sona-select-icon" src={selectedOption.icon} alt="" />}
+              {selectedOption ? selectedOption.label : displayPlaceholder}
+            </>
+          )}
         </span>
         <svg className={`sona-select-arrow${isOpen ? ' sona-select-arrow--open' : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="6 9 12 15 18 9" />
