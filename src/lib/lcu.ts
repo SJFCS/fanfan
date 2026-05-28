@@ -30,6 +30,8 @@ import type {
   MatchHistoryResponse,
   MatchDetail,
   ChatFriend,
+  ChatFriendGroup,
+  GiftableFriend,
   SpectatorLaunchPayload,
   SummonerSpellData,
   ChampionSummaryData,
@@ -41,7 +43,7 @@ import type { SgpEntitlementsToken } from '@/types/sgp'
 import { store } from '@/lib/store'
 
 // Re-export types for convenience
-export type { SummonerInfo, LobbyConfig, Lobby, GameflowPhase, GameflowSession, LCUEventMessage, ChatConversation, ChatMessage, ChatMe, Availability, SendChatMessageBody, ReadyCheck, ChampSelectSession, ChampSelectPlayerDetail, MatchHistoryResponse, MatchDetail, ChatFriend, SpectatorLaunchPayload, ChampSelectSummoner }
+export type { SummonerInfo, LobbyConfig, Lobby, GameflowPhase, GameflowSession, LCUEventMessage, ChatConversation, ChatMessage, ChatMe, Availability, SendChatMessageBody, ReadyCheck, ChampSelectSession, ChampSelectPlayerDetail, MatchHistoryResponse, MatchDetail, ChatFriend, ChatFriendGroup, GiftableFriend, SpectatorLaunchPayload, ChampSelectSummoner }
 export type { SgpEntitlementsToken, SgpMatchHistoryLol } from '@/types/sgp'
 export { SGP_SERVERS, TENCENT_MATCH_HISTORY_INTEROP, TENCENT_SERVER_NAMES, queueIdToTag } from '@/types/sgp'
 
@@ -1280,6 +1282,18 @@ class LCUManager {
    */
   getFriends(): Promise<ChatFriend[]> {
     return get<ChatFriend[]>('/lol-chat/v1/friends')
+  }
+
+  getFriendGroups(): Promise<ChatFriendGroup[]> {
+    return get<ChatFriendGroup[]>('/lol-chat/v1/friend-groups')
+  }
+
+  deleteFriend(friendId: string): Promise<void> {
+    return del<void>(`/lol-chat/v1/friends/${encodeURIComponent(friendId)}`)
+  }
+
+  getGiftableFriends(): Promise<GiftableFriend[]> {
+    return get<GiftableFriend[]>('/lol-store/v1/giftablefriends')
   }
 
   // ==================== 游戏资源 ====================

@@ -12,12 +12,13 @@ import { AutomationPage } from '@/components/pages/AutomationPage'
 import { NexusPage } from '@/components/pages/NexusPage'
 import { CustomPage } from '@/components/pages/CustomPage'
 import { ToolkitPage } from '@/components/pages/ToolkitPage'
+import { FriendManagerPage } from '@/components/pages/FriendManagerPage'
 import { OptionsPage } from '@/components/pages/OptionsPage'
 import { AboutPage } from '@/components/pages/AboutPage'
 import { DebugPage } from '@/components/pages/DebugPage'
 import { UpdatePage } from '@/components/pages/UpdatePage'
 import { AutoClaimPage } from '@/components/pages/AutoClaimPage'
-import { GamepadIcon, PaletteIcon, SettingsIcon, InfoIcon, BugIcon, ZapIcon, EnhanceIcon, AutomationIcon, NexusIcon, UpdateIcon, RewardIcon } from '@/components/ui/icons'
+import { GamepadIcon, PaletteIcon, SettingsIcon, InfoIcon, BugIcon, ZapIcon, EnhanceIcon, AutomationIcon, NexusIcon, UpdateIcon, RewardIcon, FriendManagerIcon } from '@/components/ui/icons'
 import { onModalVisibilityChange, isModalVisible, closeModal } from '@/lib/modal'
 import { store } from '@/lib/store'
 import { getUpdateState, onUpdateStateChange, type UpdateState } from '@/lib/update-checker'
@@ -31,6 +32,7 @@ const baseSidebarItemConfigs: Array<Omit<SidebarItem, 'label'> & { labelKey: Tra
   { id: 'custom', icon: <PaletteIcon />, labelKey: 'nav.custom' },
   { id: 'toolkit', icon: <GamepadIcon />, labelKey: 'nav.toolkit' },
   { id: 'auto-claim', icon: <RewardIcon />, labelKey: 'nav.autoClaim' },
+  { id: 'friend-manager', icon: <FriendManagerIcon />, labelKey: 'nav.friendManager' },
   { id: 'options', icon: <SettingsIcon />, labelKey: 'nav.options' },
   // { id: 'tools', icon: <GamepadIcon />, labelKey: 'nav.tools' },
   // { id: 'beautify', icon: <PaletteIcon />, labelKey: 'nav.beautify' },
@@ -60,6 +62,8 @@ function PageContent({ pageId }: { pageId: string }) {
       return <AutoClaimPage />
     case 'nexus':
       return <NexusPage />
+    case 'friend-manager':
+      return <FriendManagerPage />
     case 'toolkit':
       return <ToolkitPage />         
     case 'custom':

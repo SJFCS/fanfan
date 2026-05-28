@@ -336,6 +336,23 @@ export interface ChatFriend {
   lol: LolSubStatus
 }
 
+/** /lol-chat/v1/friend-groups 返回的好友分组 */
+export interface ChatFriendGroup {
+  id: number
+  name: string
+  priority: number
+  collapsed?: boolean
+  isMetaGroup?: boolean
+}
+
+/** /lol-store/v1/giftablefriends 返回的可赠送好友对象 */
+export interface GiftableFriend {
+  friendsSince: string
+  nick: string
+  oldFriends: boolean
+  summonerId: number
+}
+
 /** POST /lol-spectator/v1/spectate/launch 的请求体 */
 export interface SpectatorLaunchPayload {
   allowObserveMode: 'ALL' | 'FRIENDS' | 'NONE' | (string & {})

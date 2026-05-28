@@ -109,6 +109,18 @@ export function NexusIcon() {
   )
 }
 
+export function FriendManagerIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="7" r="3.2" />
+      <path d="M3.6 18.8a5.4 5.4 0 0 1 10.8 0" />
+      <path d="M16.5 9.2h4.2" />
+      <path d="M17.1 13.1h3" />
+      <path d="M18 17h1.4" />
+    </svg>
+  )
+}
+
 export function UpdateIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
