@@ -891,9 +891,11 @@ export function CustomPage() {
   const [unlockChromas, setUnlockChromas] = useState(store.get('unlockChromas'))
 
   const [globalParticle, setGlobalParticle] = useState(store.get('globalParticle'))
+  const [hideProfileOverviewBackdrop, setHideProfileOverviewBackdrop] = useState(store.get('hideProfileOverviewBackdrop'))
     useEffect(() => {
       const unsubs = [
         store.onChange('globalParticle', setGlobalParticle),
+        store.onChange('hideProfileOverviewBackdrop', setHideProfileOverviewBackdrop),
       ]
       return () => unsubs.forEach((fn) => fn())
     }, [])
@@ -1262,6 +1264,15 @@ export function CustomPage() {
                   />
                 </div>
               </SettingCard>
+              <SettingCard
+                title={t('beautify.profileOverviewBackdrop.title')}
+                description={t('beautify.profileOverviewBackdrop.description')}
+              >
+                <SonaSwitch
+                  checked={hideProfileOverviewBackdrop}
+                  onChange={(v) => { setHideProfileOverviewBackdrop(v); store.set('hideProfileOverviewBackdrop', v) }}
+                />
+              </SettingCard>
             </div>
           </div>
         )}
@@ -1273,7 +1284,7 @@ export function CustomPage() {
             checked={globalParticle}
             onChange={(v) => { setGlobalParticle(v); store.set('globalParticle', v) }}
           />
-        </SettingCard>          
+        </SettingCard>
       </SettingGroup>
 
       <SettingGroup title={t('beautify.group.ui')}>

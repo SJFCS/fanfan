@@ -36,6 +36,7 @@ import { updateOpggBuildRecommendation } from '@/lib/features/opgg-build-recomme
 import { updateBeautifyCustomAvatar } from '@/lib/features/beautify-client/custom-avatar'
 import { initSocialSidebarGlass, updateSocialSidebarGlassConfig } from '@/lib/features/beautify-client/social-sidebar-glass'
 import { updateBeautifyHomepageBackground, updateBeautifyHomepageBackgroundAdjustments, updateBeautifyHomepageBackgroundGlassConfig } from '@/lib/features/beautify-client/homepage-background'
+import { updateHideProfileOverviewBackdrop } from '@/lib/features/beautify-client/profile-overview-backdrop'
 import { updateBeautifyWallpaperMode, updateBeautifyWallpaperModeGlassConfig } from '@/lib/features/beautify-client/wallpaper-mode'
 import { updateGameModeFilter } from '@/lib/features/game-mode-filter'
 import { preloadChampSelectTierBadgeData, updateChampSelectTierBadge } from '@/lib/features/champselect-tier-badge'
@@ -898,6 +899,9 @@ export function initFeatures() {
     updateBeautifyWallpaperMode(enabled)
     syncHomepageBackground()
   })
+
+  updateHideProfileOverviewBackdrop(store.get('hideProfileOverviewBackdrop'))
+  store.onChange('hideProfileOverviewBackdrop', updateHideProfileOverviewBackdrop)
 
   const syncAutoReturnToLobby = () => {
     const enabled = store.get('autoHonor') && store.get('autoReturnToLobby')
