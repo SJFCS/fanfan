@@ -7,8 +7,10 @@ import { translate } from '@/i18n'
 import {
   clearAvatarUrlFromStatusMessage,
   decodeAvatarStatusPayload,
+  decodeAvatarStatusPayloadDetail,
   stripAvatarStatusPayload,
   uploadAvatarToImgbb,
+  writeLocalAvatarPathToStatusMessage,
   writeAvatarUrlToStatusMessage,
 } from '@/lib/features/beautify-client/avatar-status-sync'
 import { getPuuid } from '@/lib/assets'
@@ -78,6 +80,10 @@ const knownFriendPuuids = new Set<string>()
 
 function getAssetUrl(assetPath: string): string {
   return resolvePluginAssetUrl(assetPath, 'avatars')
+}
+
+function isLocalAvatarSyncEnabled(assetPath: string): boolean {
+  return store.get('customAvatarLocalSyncEnabled')[assetPath] === true
 }
 
 function getProfileIconUrl(profileIconId: number): string {
@@ -411,7 +417,8 @@ function updateRemoteAvatarFromFriendStatus(friend: ChatFriend): boolean {
   if (!puuid) return false
   if (!hasFriendStatusMessage(friend)) return false
 
-  const avatarUrl = decodeAvatarStatusPayload(getFriendStatusMessage(friend))
+  const payload = decodeAvatarStatusPayloadDetail(getFriendStatusMessage(friend))
+  const avatarUrl = payload?.kind === 'local' ? getAssetUrl(payload.value) : payload?.value
   if (!avatarUrl) {
     // 离线好友的 presence 通常不携带签名。此时保留上次解析到的头像缓存，
     // 只有在线好友明确没有隐藏 URL 时，才认为对方取消了自定义头像。
@@ -438,6 +445,12 @@ function getSavedOwnRemoteAvatarUrl(): string {
   return typeof avatarUrl === 'string' ? avatarUrl : ''
 }
 
+function getOwnAvatarPayloadValue(): string {
+  const assetPath = getCurrentAvatarAssetPath()
+  if (assetPath && isLocalAvatarSyncEnabled(assetPath)) return getAssetUrl(assetPath)
+  return getSavedOwnRemoteAvatarUrl()
+}
+
 function getSavedOwnVisibleStatusMessage(): string {
   const savedStatusMessage = store.get('statusMessage')
   return stripAvatarStatusPayload(savedStatusMessage[getPuuid()] || savedStatusMessage[getOwnPuuid()] || '')
@@ -446,28 +459,40 @@ function getSavedOwnVisibleStatusMessage(): string {
 function shouldRestoreOwnAvatarStatus(statusMessage: string | null | undefined): boolean {
   if (store.get('customAvatarAssetPaths').length === 0) return false
 
-  const savedAvatarUrl = getSavedOwnRemoteAvatarUrl()
-  if (!savedAvatarUrl) return false
+  const expectedAvatarValue = getOwnAvatarPayloadValue()
+  if (!expectedAvatarValue) return false
 
-  return decodeAvatarStatusPayload(statusMessage) !== savedAvatarUrl
+  const payload = decodeAvatarStatusPayloadDetail(statusMessage)
+  const currentAvatarValue = payload?.kind === 'local' ? getAssetUrl(payload.value) : payload?.value
+  return currentAvatarValue !== expectedAvatarValue
 }
 
 function ensureOwnAvatarStatusPayload(statusMessage?: string | null) {
   if (ownStatusRestorePromise) return ownStatusRestorePromise
 
+  const currentAssetPath = getCurrentAvatarAssetPath()
+  const useLocalSync = Boolean(currentAssetPath && isLocalAvatarSyncEnabled(currentAssetPath))
   const savedAvatarUrl = getSavedOwnRemoteAvatarUrl()
-  if (!savedAvatarUrl) return Promise.resolve()
+  if (!useLocalSync && !savedAvatarUrl) return Promise.resolve()
 
   ownStatusRestorePromise = (async () => {
     if (statusMessage !== undefined) {
       if (!shouldRestoreOwnAvatarStatus(statusMessage)) return
-      await writeAvatarUrlToStatusMessage(savedAvatarUrl, getSavedOwnVisibleStatusMessage())
+      if (useLocalSync) {
+        await writeLocalAvatarPathToStatusMessage(currentAssetPath, getSavedOwnVisibleStatusMessage())
+      } else {
+        await writeAvatarUrlToStatusMessage(savedAvatarUrl, getSavedOwnVisibleStatusMessage())
+      }
       return
     }
 
     const chatMe = await lcu.getChatMe()
     if (shouldRestoreOwnAvatarStatus(chatMe.statusMessage)) {
-      await writeAvatarUrlToStatusMessage(savedAvatarUrl, getSavedOwnVisibleStatusMessage())
+      if (useLocalSync) {
+        await writeLocalAvatarPathToStatusMessage(currentAssetPath, getSavedOwnVisibleStatusMessage())
+      } else {
+        await writeAvatarUrlToStatusMessage(savedAvatarUrl, getSavedOwnVisibleStatusMessage())
+      }
     }
   })()
     .catch((err) => {
@@ -1108,6 +1133,13 @@ export async function syncCustomAvatarAssetPath(assetPath: string, imageOverride
 
   if (!ownPuuid) {
     throw new Error('无法获取当前玩家 PUUID。')
+  }
+
+  if (isLocalAvatarSyncEnabled(assetPath)) {
+    await writeLocalAvatarPathToStatusMessage(assetPath, getSavedOwnVisibleStatusMessage())
+    remoteAvatarCache.set(ownPuuid, getAssetUrl(assetPath))
+    scheduleApplyCustomAvatar()
+    return getAssetUrl(assetPath)
   }
 
   const assetResponse = imageOverride ? null : await fetch(getAssetUrl(assetPath))

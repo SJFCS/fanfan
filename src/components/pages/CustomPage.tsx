@@ -218,6 +218,7 @@ export function CustomPage() {
   const [customAvatarAssetPaths, setCustomAvatarAssetPaths] = useState(() => store.get('customAvatarAssetPaths'))
   const [customAvatarActiveAssetPath, setCustomAvatarActiveAssetPath] = useState(() => store.get('customAvatarActiveAssetPath'))
   const [customAvatarAdjustments, setCustomAvatarAdjustments] = useState(() => store.get('customAvatarAdjustments'))
+  const [customAvatarLocalSyncEnabled, setCustomAvatarLocalSyncEnabled] = useState(() => store.get('customAvatarLocalSyncEnabled'))
   const [avatarImageSizes, setAvatarImageSizes] = useState<Record<string, { width: number; height: number }>>({})
   const [wallpaperMediaSizes, setWallpaperMediaSizes] = useState<Record<string, WallpaperMediaSize>>({})
   const [assetMessage, setAssetMessage] = useState(() => t('beautify.assets.instructions'))
@@ -249,6 +250,11 @@ export function CustomPage() {
   const saveCustomAvatarAdjustments = (adjustments: Record<string, AvatarAdjustment>) => {
     setCustomAvatarAdjustments(adjustments)
     store.set('customAvatarAdjustments', adjustments)
+  }
+
+  const saveCustomAvatarLocalSyncEnabled = (config: Record<string, boolean>) => {
+    setCustomAvatarLocalSyncEnabled(config)
+    store.set('customAvatarLocalSyncEnabled', config)
   }
 
   const saveHomepageBackgroundAssetPath = (assetPath: string | null) => {
@@ -351,9 +357,12 @@ export function CustomPage() {
     saveHomepageBackgroundAdjustments(nextHomepageBackgroundAdjustments)
     const nextCustomAvatarAssetPaths = customAvatarAssetPaths.filter((path) => path !== assetPath)
     const nextCustomAvatarAdjustments = { ...customAvatarAdjustments }
+    const nextCustomAvatarLocalSyncEnabled = { ...customAvatarLocalSyncEnabled }
     delete nextCustomAvatarAdjustments[assetPath]
+    delete nextCustomAvatarLocalSyncEnabled[assetPath]
     saveCustomAvatarAssetPaths(nextCustomAvatarAssetPaths)
     saveCustomAvatarAdjustments(nextCustomAvatarAdjustments)
+    saveCustomAvatarLocalSyncEnabled(nextCustomAvatarLocalSyncEnabled)
     if (customAvatarActiveAssetPath === assetPath) {
       saveCustomAvatarActiveAssetPath(nextCustomAvatarAssetPaths[0] ?? null)
     }
@@ -674,7 +683,9 @@ export function CustomPage() {
       if (!store.get('customAvatarMode')) return
       if ((store.get('customAvatarActiveAssetPath') ?? store.get('customAvatarAssetPaths')[0]) !== assetPath) return
 
-      setAssetMessage(t('beautify.status.avatarSynced', { path: assetPath }))
+      setAssetMessage(store.get('customAvatarLocalSyncEnabled')[assetPath]
+        ? t('beautify.status.avatarLocalSynced', { path: assetPath })
+        : t('beautify.status.avatarSynced', { path: assetPath }))
     } catch (err) {
       if (store.get('customAvatarMode') && (store.get('customAvatarActiveAssetPath') ?? store.get('customAvatarAssetPaths')[0]) === assetPath) {
         setAssetMessage(t('beautify.status.avatarSyncFailed', { error: err instanceof Error ? err.message : String(err) }))
@@ -763,6 +774,26 @@ export function CustomPage() {
     } else if (isActivePath) {
       cancelScheduledCustomAvatarSync()
       setAssetMessage(t('beautify.assets.instructions'))
+    }
+  }
+
+  const toggleCustomAvatarLocalSync = (assetPath: string, enabled: boolean) => {
+    const nextConfig = {
+      ...customAvatarLocalSyncEnabled,
+      [assetPath]: enabled,
+    }
+    if (!enabled) {
+      delete nextConfig[assetPath]
+    }
+
+    saveCustomAvatarLocalSyncEnabled(nextConfig)
+
+    if (customAvatarMode && (customAvatarActiveAssetPath ?? customAvatarAssetPaths[0]) === assetPath) {
+      scheduleCustomAvatarSync(assetPath)
+    } else {
+      setAssetMessage(enabled
+        ? t('beautify.status.avatarLocalSyncEnabled', { path: assetPath })
+        : t('beautify.status.avatarLocalSyncDisabled', { path: assetPath }))
     }
   }
 
@@ -1444,7 +1475,7 @@ export function CustomPage() {
         open={Boolean(editingAvatarAssetPath)}
         onClose={closeCustomAvatarAdjustModal}
         width={620}
-        height={560}
+        height="auto"
       >
         <div className="sona-wallpaper-adjust-modal">
           <div className="sona-wallpaper-adjust-header">
@@ -1480,6 +1511,18 @@ export function CustomPage() {
                 <div className="sona-wallpaper-adjust-hint">
                   {t('beautify.avatar.adjustHint')}
                 </div>
+                <p className="sona-avatar-adjust-status">{assetMessage}</p>
+                <label className="sona-avatar-local-sync-row">
+                  <input
+                    type="checkbox"
+                    checked={customAvatarLocalSyncEnabled[editingAvatarAssetPath] === true}
+                    onChange={(event) => toggleCustomAvatarLocalSync(editingAvatarAssetPath, event.currentTarget.checked)}
+                  />
+                  <span>
+                    <strong>{t('beautify.avatar.localSync')}</strong>
+                    <small>{t('beautify.avatar.localSync.description')}</small>
+                  </span>
+                </label>
               </div>
             </div>
           )}

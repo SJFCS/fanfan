@@ -143,6 +143,8 @@ export interface SonaConfig {
     offsetX: number
     offsetY: number
   }>
+  /** 自定义头像本地同步开关：key 为 assets/avatars 下的路径，true 时状态签名写入本地资源标识而非上传图床 */
+  customAvatarLocalSyncEnabled: Record<string, boolean>
   /** 好友可见自定义头像缓存：key 为 PUUID，value 为远端图片直链 */
   customAvatarRemoteCache: Record<string, string>
   /** 好友智能分组（开黑好友用同样颜色的border-right展示） */
@@ -276,6 +278,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   customAvatarAssetPaths: [],
   customAvatarActiveAssetPath: null,
   customAvatarAdjustments: {},
+  customAvatarLocalSyncEnabled: {},
   customAvatarRemoteCache: {},
   friendSmartGroup: false,
   enhancedFriendGameStatus: true,

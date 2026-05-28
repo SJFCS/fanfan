@@ -3,6 +3,7 @@ import { lcu } from '@/lib/lcu'
 const IMGBB_API_KEY = 'fb01ca11e6e28914577b493ecca045bc'
 const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload'
 const AVATAR_PAYLOAD_PREFIX = 'sona-avatar:v1:'
+const LOCAL_AVATAR_PAYLOAD_PREFIX = 'sona-avatar-local:v1:'
 
 // NekoCrypt uses FE00-FE0F as an invisible alphabet. Here we keep the same
 // alphabet but encode bytes by nibbles, avoiding BigInteger/base-N work.
@@ -66,8 +67,33 @@ function isValidAvatarUrl(value: string): boolean {
   }
 }
 
-export function encodeAvatarStatusPayload(avatarUrl: string): string {
-  return `${AVATAR_STATUS_START}${encodeTextToZeroWidth(`${AVATAR_PAYLOAD_PREFIX}${avatarUrl}`)}${AVATAR_STATUS_END}`
+function normalizeLocalAvatarPath(value: string): string {
+  return value
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/\\/g, '/')
+    .replace(/^\.\/+/, '')
+    .replace(/^assets\/+/i, '')
+    .replace(/^avatars\/+/i, '')
+    .replace(/^\/+/, '')
+}
+
+function isValidLocalAvatarPath(value: string): boolean {
+  const normalizedPath = normalizeLocalAvatarPath(value)
+  return Boolean(normalizedPath) && !normalizedPath.includes('..') && !/^[a-z]+:\/\//i.test(normalizedPath)
+}
+
+export interface AvatarStatusPayload {
+  kind: 'remote' | 'local'
+  value: string
+}
+
+export function encodeAvatarStatusPayload(payload: AvatarStatusPayload | string): string {
+  const payloadText = typeof payload === 'string'
+    ? `${AVATAR_PAYLOAD_PREFIX}${payload}`
+    : `${payload.kind === 'local' ? LOCAL_AVATAR_PAYLOAD_PREFIX : AVATAR_PAYLOAD_PREFIX}${payload.value}`
+
+  return `${AVATAR_STATUS_START}${encodeTextToZeroWidth(payloadText)}${AVATAR_STATUS_END}`
 }
 
 export function stripAvatarStatusPayload(statusMessage: string | null | undefined): string {
@@ -91,7 +117,12 @@ export function embedAvatarStatusPayload(statusMessage: string | null | undefine
   return `${encodeAvatarStatusPayload(avatarUrl)}${visibleStatusMessage}`
 }
 
-export function decodeAvatarStatusPayload(statusMessage: string | null | undefined): string | null {
+export function embedLocalAvatarStatusPayload(statusMessage: string | null | undefined, assetPath: string): string {
+  const visibleStatusMessage = stripAvatarStatusPayload(statusMessage)
+  return `${encodeAvatarStatusPayload({ kind: 'local', value: normalizeLocalAvatarPath(assetPath) })}${visibleStatusMessage}`
+}
+
+export function decodeAvatarStatusPayloadDetail(statusMessage: string | null | undefined): AvatarStatusPayload | null {
   const source = statusMessage ?? ''
   const start = source.indexOf(AVATAR_STATUS_START)
   if (start < 0) return null
@@ -101,10 +132,22 @@ export function decodeAvatarStatusPayload(statusMessage: string | null | undefin
   if (end < 0) return null
 
   const decoded = decodeTextFromZeroWidth(source.slice(payloadStart, end))
-  if (!decoded?.startsWith(AVATAR_PAYLOAD_PREFIX)) return null
+  if (!decoded) return null
+
+  if (decoded.startsWith(LOCAL_AVATAR_PAYLOAD_PREFIX)) {
+    const assetPath = normalizeLocalAvatarPath(decoded.slice(LOCAL_AVATAR_PAYLOAD_PREFIX.length))
+    return isValidLocalAvatarPath(assetPath) ? { kind: 'local', value: assetPath } : null
+  }
+
+  if (!decoded.startsWith(AVATAR_PAYLOAD_PREFIX)) return null
 
   const avatarUrl = decoded.slice(AVATAR_PAYLOAD_PREFIX.length)
-  return isValidAvatarUrl(avatarUrl) ? avatarUrl : null
+  return isValidAvatarUrl(avatarUrl) ? { kind: 'remote', value: avatarUrl } : null
+}
+
+export function decodeAvatarStatusPayload(statusMessage: string | null | undefined): string | null {
+  const payload = decodeAvatarStatusPayloadDetail(statusMessage)
+  return payload?.kind === 'remote' ? payload.value : null
 }
 
 export async function uploadAvatarToImgbb(image: Blob): Promise<string> {
@@ -138,6 +181,20 @@ export async function writeAvatarUrlToStatusMessage(avatarUrl: string, fallbackS
     ? currentStatusMessage
     : fallbackVisibleStatusMessage
   const nextStatusMessage = embedAvatarStatusPayload(baseStatusMessage, avatarUrl)
+  if (nextStatusMessage !== (chatMe.statusMessage ?? '')) {
+    await lcu.setStatusMessage(nextStatusMessage)
+  }
+}
+
+export async function writeLocalAvatarPathToStatusMessage(assetPath: string, fallbackStatusMessage = ''): Promise<void> {
+  const chatMe = await lcu.getChatMe()
+  const currentStatusMessage = chatMe.statusMessage ?? ''
+  const currentVisibleStatusMessage = stripAvatarStatusPayload(currentStatusMessage)
+  const fallbackVisibleStatusMessage = stripAvatarStatusPayload(fallbackStatusMessage)
+  const baseStatusMessage = currentVisibleStatusMessage
+    ? currentStatusMessage
+    : fallbackVisibleStatusMessage
+  const nextStatusMessage = embedLocalAvatarStatusPayload(baseStatusMessage, assetPath)
   if (nextStatusMessage !== (chatMe.statusMessage ?? '')) {
     await lcu.setStatusMessage(nextStatusMessage)
   }

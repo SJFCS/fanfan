@@ -661,7 +661,9 @@
   display: flex;
   flex-direction: column;
   height: fit-content;
+  max-height: 88vh;
   padding: 24px;
+  overflow-y: auto;
 }
 
 .sona-wallpaper-adjust-header {
@@ -799,6 +801,55 @@
   font-size: 11px;
   line-height: 1.5;
   text-align: center;
+}
+
+.sona-avatar-adjust-status {
+  margin: 8px 0 0;
+  color: #a09b8c;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.sona-avatar-local-sync-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(1, 10, 19, 0.32);
+  border: 1px solid rgba(200, 170, 110, 0.14);
+  border-radius: 4px;
+  color: #a09b8c;
+  cursor: pointer;
+}
+
+.sona-avatar-local-sync-row input {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin: 2px 0 0;
+  accent-color: #c8aa6e;
+  cursor: pointer;
+}
+
+.sona-avatar-local-sync-row span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sona-avatar-local-sync-row strong {
+  color: #c8aa6e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sona-avatar-local-sync-row small {
+  color: #785a28;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .sona-wallpaper-adjust-actions {
