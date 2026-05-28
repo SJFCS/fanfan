@@ -187,6 +187,11 @@ export function AutomationPage() {
     store.set('autoLockChampionIds', next)
   }
 
+  const reorderAutoLockChampions = (championIds: number[]) => {
+    setAutoLockChampionIds(championIds)
+    store.set('autoLockChampionIds', championIds)
+  }
+
   const addHextechAramAutoLockChampion = (champion: ChampionInfo) => {
     if (hextechAramAutoLockChampionIds.includes(champion.id)) {
       setHextechChampSearchText('')
@@ -469,6 +474,7 @@ export function AutomationPage() {
               championIds={autoLockChampionIds}
               emptyText={t('tools.autoLock.empty')}
               onRemove={removeAutoLockChampion}
+              onReorder={reorderAutoLockChampions}
             />
           </div>
         )}
