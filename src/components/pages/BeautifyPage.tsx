@@ -143,6 +143,10 @@ export function BeautifyPage() {
   }
 
   const toggleBeautifyWallpaperMode = (enabled: boolean) => {
+    if (!enabled) {
+      setHomepageBackgroundRandom(false)
+      store.set('beautifyHomepageBackgroundRandom', false)
+    }
     setBeautifyWallpaperMode(enabled)
     store.set('beautifyWallpaperMode', enabled)
   }

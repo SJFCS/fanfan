@@ -785,7 +785,16 @@ function syncHomepageBackgroundGlassConfig() {
   })
 }
 
+function syncHomepageBackground() {
+  updateBeautifyHomepageBackground(
+    store.get('beautifyWallpaperMode')
+      ? store.get('beautifyHomepageBackgroundAssetPath')
+      : null,
+  )
+}
+
 function pickRandomHomepageBackgroundOnStartup() {
+  if (!store.get('beautifyWallpaperMode')) return
   if (!store.get('beautifyHomepageBackgroundRandom')) return
 
   const assetPaths = store.get('beautifyHomepageBackgroundAssetPaths').filter(Boolean)
@@ -881,11 +890,14 @@ export function initFeatures() {
   updateBeautifyHomepageBackgroundAdjustments(store.get('beautifyHomepageBackgroundAdjustments'))
   store.onChange('beautifyHomepageBackgroundAdjustments', updateBeautifyHomepageBackgroundAdjustments)
   pickRandomHomepageBackgroundOnStartup()
-  updateBeautifyHomepageBackground(store.get('beautifyHomepageBackgroundAssetPath'))
-  store.onChange('beautifyHomepageBackgroundAssetPath', updateBeautifyHomepageBackground)
+  syncHomepageBackground()
+  store.onChange('beautifyHomepageBackgroundAssetPath', syncHomepageBackground)
 
   updateBeautifyWallpaperMode(store.get('beautifyWallpaperMode'))
-  store.onChange('beautifyWallpaperMode', updateBeautifyWallpaperMode)
+  store.onChange('beautifyWallpaperMode', (enabled) => {
+    updateBeautifyWallpaperMode(enabled)
+    syncHomepageBackground()
+  })
 
   const syncAutoReturnToLobby = () => {
     const enabled = store.get('autoHonor') && store.get('autoReturnToLobby')
