@@ -360,8 +360,6 @@ export function AutoClaimPage() {
 
   return (
     <div className="sona-settings sona-claim-page">
-      <h2 className="sona-settings-title">{t('autoClaim.title')}</h2>
-
       <SettingGroup title={t('autoClaim.section.events.title')}>
         <ClaimSection
           title=""

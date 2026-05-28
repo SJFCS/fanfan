@@ -26,7 +26,7 @@ export const zhCN = {
   'nav.nexus': '社交增强',  
   'nav.friendManager': '好友管理',
   'nav.custom': '界面美化',
-  'nav.autoClaim': '奖品中心',
+  'nav.autoClaim': '奖励中心',
   'nav.options': '游戏设置',
   'nav.tools': '工具',
   'nav.beautify': '美化',
