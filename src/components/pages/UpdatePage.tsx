@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { SonaButton } from '@/components/ui/SonaButton'
-import { checkForUpdates, getReleasePageUrl, getUpdateState, onUpdateStateChange, type UpdateState } from '@/lib/update-checker'
+import { checkForUpdates, getReleasePageUrl, getUpdateState, onUpdateStateChange, skipUpdateVersion, type UpdateState } from '@/lib/update-checker'
 import { useI18n } from '@/i18n'
 import '@/styles/UpdatePage.css'
 
@@ -49,9 +49,14 @@ export function UpdatePage() {
               {info.publishedAt && <time dateTime={info.publishedAt}>{formatPublishedDate(info.publishedAt)}</time>}
             </div>
             <pre className="sona-update-notes">{info.releaseBody}</pre>
-              <SonaButton variant="primary" style={{ marginTop: '16px' }} onClick={() => openUrl(info.releaseUrl || getReleasePageUrl())}>
+            <div className="sona-update-actions">
+              <SonaButton variant="primary" onClick={() => openUrl(info.releaseUrl || getReleasePageUrl())}>
                 {t('update.openRelease')}
               </SonaButton>
+              <SonaButton onClick={() => skipUpdateVersion(info.latestVersion)}>
+                {t('update.skipVersion', { version: info.latestVersion })}
+              </SonaButton>
+            </div>
           </div>
         </>
       ) : (
