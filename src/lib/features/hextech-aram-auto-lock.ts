@@ -1,6 +1,6 @@
 import { logger } from '@/index'
 import { translate } from '@/i18n'
-import { getChampionById, getQueue } from '@/lib/assets'
+import { getChampionById } from '@/lib/assets'
 import { lcu, LcuEventUri } from '@/lib/lcu'
 import type { ChampSelectSession, GameflowPhase, LCUEventMessage } from '@/lib/lcu'
 import type { ChampSelectAction } from '@/types/lcu'
@@ -46,13 +46,12 @@ async function getIdSet(loader: () => Promise<number[]>): Promise<Set<number>> {
   }
 }
 
-async function isHextechAramSession(session: ChampSelectSession): Promise<boolean> {
-  const queueMode = getQueue(session.queueId)?.gameMode
-  if (queueMode?.toLowerCase() === 'kiwi') return true
-
-  const gameflow = await lcu.getGameflowSession().catch(() => null)
-  const gameMode = gameflow?.gameData?.queue?.gameMode || gameflow?.map?.gameMode || ''
-  return gameMode.toLowerCase() === 'kiwi'
+function hasChampionPool(session: ChampSelectSession): boolean {
+  return Boolean(
+    session.allowSubsetChampionPicks
+    || session.benchEnabled
+    || session.benchChampions.length > 0,
+  )
 }
 
 async function notifyHextechGrabSuccess(championId: number) {
@@ -192,7 +191,7 @@ function recordManualSwap(session: ChampSelectSession) {
 
   if (!isAutoChange && isConfiguredChampion(lastChampionId)) {
     userRejectedChampionIds.add(lastChampionId)
-    logger.info('[HextechAramAutoLock] User rejected auto champion for this session: %d', lastChampionId)
+  logger.info('[PoolAutoLock] User rejected auto champion for this session: %d', lastChampionId)
   }
 
   if (isAutoChange) {
@@ -256,8 +255,8 @@ async function handleChampSelectSession(session: ChampSelectSession, source: 'ev
 
   isHandling = true
   try {
-    if (!await isHextechAramSession(session)) {
-      logger.info('[HextechAramAutoLock] Current champ select is not KIWI, skip')
+    if (!hasChampionPool(session)) {
+    logger.info('[PoolAutoLock] Current champ select has no champion pool, skip')
       resetSessionState()
       return
     }
@@ -270,7 +269,7 @@ async function handleChampSelectSession(session: ChampSelectSession, source: 'ev
       }
 
       if (await pickSubsetChampion(session, championId)) {
-        logger.info('[HextechAramAutoLock] Picked subset champion: %d', championId)
+        logger.info('[PoolAutoLock] Picked subset champion: %d', championId)
         notifyHextechGrabSuccess(championId)
       } else {
         scheduleRetry()
@@ -278,7 +277,7 @@ async function handleChampSelectSession(session: ChampSelectSession, source: 'ev
       return
     }
 
-    if (!session.benchEnabled || session.timer.phase !== 'FINALIZATION') {
+    if ((!session.benchEnabled && session.benchChampions.length === 0) || session.timer.phase !== 'FINALIZATION') {
       return
     }
 
@@ -289,14 +288,14 @@ async function handleChampSelectSession(session: ChampSelectSession, source: 'ev
 
     try {
       await swapBenchChampion(championId)
-      logger.info('[HextechAramAutoLock] Swapped bench champion: %d', championId)
+      logger.info('[PoolAutoLock] Swapped bench champion: %d', championId)
       notifyHextechGrabSuccess(championId)
     } catch (err) {
-      logger.warn('[HextechAramAutoLock] Bench swap failed, retry later: %o', err)
+      logger.warn('[PoolAutoLock] Bench swap failed, retry later: %o', err)
       scheduleRetry()
     }
   } catch (err) {
-    logger.warn('[HextechAramAutoLock] Failed to handle champ-select update: %o', err)
+    logger.warn('[PoolAutoLock] Failed to handle champ-select update: %o', err)
     if (source === 'event') scheduleRetry()
   } finally {
     isHandling = false
@@ -359,11 +358,11 @@ export function updateHextechAramAutoLock(enabled: boolean) {
         stopChampSelectListener()
       }
     })
-    logger.info('Hextech ARAM auto lock enabled')
+    logger.info('Champion pool auto lock enabled')
   } else if (!enabled && gameflowUnsub) {
     gameflowUnsub()
     gameflowUnsub = null
     stopChampSelectListener()
-    logger.info('Hextech ARAM auto lock disabled')
+    logger.info('Champion pool auto lock disabled')
   }
 }
