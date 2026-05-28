@@ -27,7 +27,6 @@ Source: "{Embedding}\slides\*";                     DestDir: "{tmp}"; Flags: don
 
 ; 软件主程序文件
 Source: "{app}\Pengu\core.dll";                     DestDir: "{app}"; Flags: ignoreversion
-Source: "{app}\Pengu\手动安装.bat";                 DestDir: "{app}"; Flags: ignoreversion
 Source: "{app}\Pengu\.pengu\*";                     DestDir: "{commonappdata}\.pengu\"; Flags: recursesubdirs createallsubdirs ignoreversion
 ; ACE 限制器
 Source: "{app}\ACE\ace.ps1";                        DestDir: "{app}"; Flags: ignoreversion
