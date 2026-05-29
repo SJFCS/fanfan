@@ -28,6 +28,8 @@ export type LobbyEnhancementDisplayMode = 'humor' | 'score'
 export interface SonaConfig {
   /** 自动接受对局 */
   autoAcceptMatch: boolean
+  /** 房间右上角自动接受按钮的持久化开关状态 */
+  lobbyHeaderAutoAcceptEnabled: boolean
   /** 自动接受对局的随机延迟：最小值（毫秒），0 或非法值视为无延迟 */
   autoAcceptDelayMin: number
   /** 自动接受对局的随机延迟：最大值（毫秒），上限 15000；非法则秒接 */
@@ -238,6 +240,8 @@ export interface SonaConfig {
   autoReturnMode: 'queue' | 'lobby'
   /** 自动匹配 */
   autoMatchmaking: boolean
+  /** 房间右上角自动匹配按钮的持久化开关状态 */
+  lobbyHeaderAutoMatchmakingEnabled: boolean
   /** 自动匹配最低房间人数 */
   autoMatchmakingMinimumMembers: number
   /** 自动匹配前等待时长（秒） */
@@ -251,6 +255,7 @@ export interface SonaConfig {
 /** 配置项默认值 */
 const DEFAULT_CONFIG: SonaConfig = {
   autoAcceptMatch: false,
+  lobbyHeaderAutoAcceptEnabled: true,
   autoAcceptDelayMin: 0,
   autoAcceptDelayMax: 0,
   developerMode: false,
@@ -343,6 +348,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   autoReturnToLobby: false,
   autoReturnMode: 'queue',
   autoMatchmaking: false,
+  lobbyHeaderAutoMatchmakingEnabled: true,
   autoMatchmakingMinimumMembers: 1,
   autoMatchmakingDelaySeconds: 5,
   autoMatchmakingWaitForInvitees: true,

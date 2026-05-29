@@ -51,6 +51,14 @@ function getDelayMs() {
   return (Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0) * 1000
 }
 
+function shouldWaitForInvitees() {
+  return store.get('autoMatchmakingWaitForInvitees')
+}
+
+export function isAutoMatchmakingEnabledForCurrentLobby() {
+  return store.get('autoMatchmaking') && store.get('lobbyHeaderAutoMatchmakingEnabled')
+}
+
 function clearAutoMatchmakingTimer() {
   if (autoMatchmakingTimer) {
     clearTimeout(autoMatchmakingTimer)
@@ -113,7 +121,7 @@ async function getMatchmakingReadiness(): Promise<MatchmakingReadiness> {
       return { canStart: false, reason: 'matchmaking-state-unavailable' }
     }
 
-    if (store.get('autoMatchmakingWaitForInvitees') && lobby.invitations.some((invitation) => invitation.state === 'Pending')) {
+    if (shouldWaitForInvitees() && lobby.invitations.some((invitation) => invitation.state === 'Pending')) {
       return { canStart: false, reason: 'waiting-for-invitees' }
     }
 
@@ -169,7 +177,7 @@ async function startMatchmaking(runId: number) {
     logger.info('[AutoMatchmaking] 已开始自动匹配 OK')
   } catch (err) {
     logger.error('[AutoMatchmaking] 开始匹配失败:', err)
-    if (runId === autoMatchmakingRunId && store.get('autoMatchmaking')) {
+    if (runId === autoMatchmakingRunId && isAutoMatchmakingEnabledForCurrentLobby()) {
       autoMatchmakingRunId++
       autoMatchmakingTimer = setTimeout(() => {
         autoMatchmakingTimer = null
@@ -182,13 +190,13 @@ async function startMatchmaking(runId: number) {
 }
 
 async function refreshAutoMatchmaking(reason: string, resetExistingTimer = false) {
-  if (autoMatchmakingInFlight || !store.get('autoMatchmaking')) {
+  if (autoMatchmakingInFlight || !isAutoMatchmakingEnabledForCurrentLobby()) {
     return
   }
 
   const evaluateId = ++autoMatchmakingEvaluateId
   const readiness = await getMatchmakingReadiness()
-  if (evaluateId !== autoMatchmakingEvaluateId || !store.get('autoMatchmaking')) {
+  if (evaluateId !== autoMatchmakingEvaluateId || !isAutoMatchmakingEnabledForCurrentLobby()) {
     return
   }
 
@@ -254,7 +262,7 @@ export function stopAutoMatchmaking() {
 }
 
 export function refreshAutoMatchmakingConfig() {
-  if (autoMatchmakingUnsubs.length === 0 || !store.get('autoMatchmaking')) {
+  if (autoMatchmakingUnsubs.length === 0 || !isAutoMatchmakingEnabledForCurrentLobby()) {
     return
   }
 

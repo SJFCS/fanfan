@@ -180,3 +180,221 @@
 .sona-entry-btn--has-update .sona-entry-update-badge {
   display: flex;
 }
+
+/* Lobby temporary automation controls */
+.sona-lobby-automation-controls {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  align-items: flex-start;
+  margin-right: 10px;
+  pointer-events: auto;
+  z-index: 20;
+}
+
+.sona-lobby-automation-controls--empty {
+  display: none;
+}
+
+.sona-lobby-automation-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  flex: 0 0 auto;
+}
+
+.sona-lobby-automation-group--open {
+  z-index: 2;
+}
+
+.sona-lobby-automation-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sona-lobby-automation-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 148px;
+  height: 24px;
+  padding: 0 2px 0 8px;
+  border: 1px solid rgba(120, 90, 40, 0.65);
+  border-radius: 4px;
+  background: rgba(1, 10, 19, 0.72);
+  color: #a09b8c;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  outline: none;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sona-lobby-automation-switch:hover,
+.sona-lobby-automation-expand:hover,
+.sona-lobby-automation-expand--open {
+  border-color: #c8aa6e;
+  color: #f0e6d2;
+  background: rgba(30, 35, 40, 0.86);
+}
+
+.sona-lobby-automation-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sona-lobby-automation-track {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 20px;
+  border: 1px solid #5c5b57;
+  border-radius: 10px;
+  background: rgba(30, 35, 40, 0.9);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sona-lobby-automation-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #a09b8c;
+  transition: left 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sona-lobby-automation-switch--on {
+  border-color: rgba(200, 170, 110, 0.85);
+  color: #f0e6d2;
+  box-shadow: inset 0 0 10px rgba(200, 170, 110, 0.12);
+}
+
+.sona-lobby-automation-switch--on .sona-lobby-automation-track {
+  border-color: #c8aa6e;
+  background: rgba(200, 170, 110, 0.22);
+  box-shadow: inset 0 0 8px rgba(200, 170, 110, 0.26);
+}
+
+.sona-lobby-automation-switch--on .sona-lobby-automation-thumb {
+  left: 24px;
+  background: #f0e6d2;
+  box-shadow: 0 0 8px rgba(200, 170, 110, 0.8);
+}
+
+.sona-lobby-automation-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(120, 90, 40, 0.65);
+  border-radius: 4px;
+  background: rgba(1, 10, 19, 0.72);
+  color: #a09b8c;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.sona-lobby-automation-expand-icon {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.sona-lobby-automation-expand--open .sona-lobby-automation-expand-icon {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.sona-lobby-automation-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  display: none;
+  width: 230px;
+  padding: 10px;
+  border: 1px solid rgba(120, 90, 40, 0.8);
+  border-radius: 4px;
+  background: rgba(1, 10, 19, 0.96);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), inset 0 0 18px rgba(200, 170, 110, 0.05);
+}
+
+.sona-lobby-automation-panel--open {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sona-lobby-automation-field,
+.sona-lobby-automation-mini-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #a09b8c;
+  font-size: 12px;
+}
+
+.sona-lobby-automation-mini-switch {
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+.sona-lobby-automation-mini-switch:hover {
+  color: #f0e6d2;
+}
+
+.sona-lobby-automation-mini-switch--on .sona-lobby-automation-track {
+  border-color: #c8aa6e;
+  background: rgba(200, 170, 110, 0.22);
+}
+
+.sona-lobby-automation-mini-switch--on .sona-lobby-automation-thumb {
+  left: 24px;
+  background: #f0e6d2;
+  box-shadow: 0 0 8px rgba(200, 170, 110, 0.8);
+}
+
+.sona-lobby-automation-input {
+  width: 66px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(120, 90, 40, 0.8);
+  border-radius: 3px;
+  background: rgba(10, 20, 30, 0.9);
+  color: #f0e6d2;
+  font-size: 12px;
+  outline: none;
+}
+
+.sona-lobby-automation-input:focus {
+  border-color: #c8aa6e;
+  box-shadow: 0 0 0 1px rgba(200, 170, 110, 0.18);
+}
+
+.sona-lobby-automation-controls--disabled {
+  opacity: 0.55;
+}
+
+.sona-lobby-automation-controls--disabled button,
+.sona-lobby-automation-controls--disabled input {
+  cursor: not-allowed;
+}

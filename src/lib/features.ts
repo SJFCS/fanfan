@@ -13,7 +13,7 @@ import { injector } from '@/lib/InjectorManager'
 import { sleep } from '@/lib/utils'
 import { updateBalanceBuffTooltip } from '@/lib/features/balance-buff-viewer'
 import { updateChampSelectQuitButton } from '@/lib/features/champselect-quit-button'
-import { updateAutoAccept } from '@/lib/features/auto-accept'
+import { isAutoAcceptEnabledForCurrentLobby, updateAutoAccept } from '@/lib/features/auto-accept'
 import { updateDebugGameflow } from '@/lib/features/debug-gameflow'
 import { updateUnlockStatus } from '@/lib/features/unlock-status'
 import { updateBenchNoCooldown } from '@/lib/features/bench-no-cooldown'
@@ -31,7 +31,7 @@ import { updateCustomProfileBg } from '@/lib/features/profile-background'
 import { updateCustomBanner } from '@/lib/features/custom-banner'
 import { updateGameAnalysisPopup } from '@/lib/features/game-analysis-popup'
 import { updateAutoReturnToLobby } from '@/lib/features/auto-return-to-lobby'
-import { refreshAutoMatchmakingConfig, updateAutoMatchmaking } from '@/lib/features/auto-matchmaking'
+import { isAutoMatchmakingEnabledForCurrentLobby, refreshAutoMatchmakingConfig, updateAutoMatchmaking } from '@/lib/features/auto-matchmaking'
 import { updateOpggBuildRecommendation } from '@/lib/features/opgg-build-recommendation'
 import { updateBeautifyCustomAvatar } from '@/lib/features/beautify-client/custom-avatar'
 import { initSocialSidebarGlass, updateSocialSidebarGlassConfig } from '@/lib/features/beautify-client/social-sidebar-glass'
@@ -52,6 +52,7 @@ import { setAvailabilityHijackEnabled, setHideTFTEnabled, setHideRightNavTextEna
 import { calculateSonaPlayerStrengthScore, shouldSkipSonaStrengthGame, type SonaPlayerStrengthScore } from '@/lib/player-strength-score'
 import { getRating } from '@/lib/rating'
 import { translate } from '@/i18n'
+import { installLobbyTempSettings } from '@/lib/lobby-temp-settings'
 
 export { getRating } from '@/lib/rating'
 
@@ -827,9 +828,15 @@ function pickRandomHomepageBackgroundOnStartup() {
 
 export function initFeatures() {
   preloadChampSelectTierBadgeData()
+  installLobbyTempSettings()
 
-  updateAutoAccept(store.get('autoAcceptMatch'))
-  store.onChange('autoAcceptMatch', updateAutoAccept)
+  const syncAutoAccept = () => {
+    updateAutoAccept(isAutoAcceptEnabledForCurrentLobby())
+  }
+
+  syncAutoAccept()
+  store.onChange('autoAcceptMatch', syncAutoAccept)
+  store.onChange('lobbyHeaderAutoAcceptEnabled', syncAutoAccept)
 
   updateDebugGameflow(store.get('developerMode'))
   store.onChange('developerMode', updateDebugGameflow)
@@ -939,7 +946,7 @@ export function initFeatures() {
   }
 
   const syncAutoMatchmaking = () => {
-    updateAutoMatchmaking(store.get('autoMatchmaking'))
+    updateAutoMatchmaking(isAutoMatchmakingEnabledForCurrentLobby())
   }
 
   updateAutoHonor(store.get('autoHonor'))
@@ -988,6 +995,7 @@ export function initFeatures() {
   store.onChange('autoMatchmaking', () => {
     syncAutoMatchmaking()
   })
+  store.onChange('lobbyHeaderAutoMatchmakingEnabled', syncAutoMatchmaking)
   store.onChange('autoMatchmakingMinimumMembers', refreshAutoMatchmakingConfig)
   store.onChange('autoMatchmakingDelaySeconds', refreshAutoMatchmakingConfig)
   store.onChange('autoMatchmakingWaitForInvitees', refreshAutoMatchmakingConfig)

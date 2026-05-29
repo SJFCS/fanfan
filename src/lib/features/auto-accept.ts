@@ -37,6 +37,10 @@ function computeAcceptDelayMs(): number {
   return Math.round(minMs + Math.random() * (maxMs - minMs))
 }
 
+export function isAutoAcceptEnabledForCurrentLobby() {
+  return store.get('autoAcceptMatch') && store.get('lobbyHeaderAutoAcceptEnabled')
+}
+
 function scheduleAcceptMatch() {
   // 清理可能残留的上次调度（防御性）
   cancelScheduledAccept()

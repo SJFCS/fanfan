@@ -20,6 +20,12 @@ import { sleep } from '@/lib/utils'
 import { getPuuid } from '@/lib/assets'
 import { getUpdateState, onUpdateStateChange } from '@/lib/update-checker'
 import { stripAvatarStatusPayload } from '@/lib/features/beautify-client/avatar-status-sync'
+import { translate } from '@/i18n'
+import { AUTO_MATCHMAKING_MIN_MEMBERS_MAX, AUTO_MATCHMAKING_MIN_MEMBERS_MIN } from '@/lib/auto-matchmaking-config'
+import {
+  getCurrentPartyId,
+  onLobbyTempSettingsChange,
+} from '@/lib/lobby-temp-settings'
 
 /** 通用标记：标识已被 Sona 接管的 DOM 元素，防止重复绑定 */
 const HIJACKED_ATTR = 'data-sona-hijacked'
@@ -612,8 +618,301 @@ function tryHideRightNavText(): boolean {
  * 注册所有注入任务并启动全局 DOM 守护
  * 在 index.tsx 的 load() 中调用一次即可
  */
+const LOBBY_AUTOMATION_ID = 'sona-lobby-automation-controls'
+const LOBBY_AUTO_ACCEPT_MAX_DELAY_SECONDS = 15
+const LOBBY_MS_PER_SECOND = 1000
+
+let lobbyAutomationController: { root: HTMLElement; destroy: () => void } | null = null
+
+function normalizeAutoAcceptDelaySeconds(value: unknown) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.max(0, Math.min(LOBBY_AUTO_ACCEPT_MAX_DELAY_SECONDS, parsed))
+}
+
+function setAutoAcceptDelayByMaxSeconds(maxSeconds: number) {
+  const normalizedMaxSeconds = normalizeAutoAcceptDelaySeconds(maxSeconds)
+  const minSeconds = normalizedMaxSeconds - 1 < 0 ? normalizedMaxSeconds : normalizedMaxSeconds - 1
+  store.set('autoAcceptDelayMin', Math.round(minSeconds * LOBBY_MS_PER_SECOND))
+  store.set('autoAcceptDelayMax', Math.round(normalizedMaxSeconds * LOBBY_MS_PER_SECOND))
+}
+
+function normalizeLobbyMemberCount(value: unknown) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return AUTO_MATCHMAKING_MIN_MEMBERS_MIN
+  return Math.max(
+    AUTO_MATCHMAKING_MIN_MEMBERS_MIN,
+    Math.min(AUTO_MATCHMAKING_MIN_MEMBERS_MAX, Math.floor(parsed)),
+  )
+}
+
+function normalizeLobbyDelaySeconds(value: unknown) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.max(0, Math.floor(parsed))
+}
+
+function formatLobbySeconds(value: number) {
+  return `${Math.max(0, value).toFixed(1)} s`
+}
+
+function getLobbyAutomationSnapshot() {
+  const autoAcceptGloballyEnabled = store.get('autoAcceptMatch')
+  const autoMatchmakingGloballyEnabled = store.get('autoMatchmaking')
+
+  return {
+    partyId: getCurrentPartyId(),
+    autoAcceptGloballyEnabled,
+    autoAcceptEnabled: autoAcceptGloballyEnabled && store.get('lobbyHeaderAutoAcceptEnabled'),
+    autoAcceptDelaySeconds: Math.max(0, store.get('autoAcceptDelayMax') || 0) / 1000,
+    autoMatchmakingGloballyEnabled,
+    autoMatchmakingEnabled: autoMatchmakingGloballyEnabled && store.get('lobbyHeaderAutoMatchmakingEnabled'),
+    autoMatchmakingMinimumMembers: normalizeLobbyMemberCount(
+      store.get('autoMatchmakingMinimumMembers'),
+    ),
+    autoMatchmakingDelaySeconds: normalizeLobbyDelaySeconds(
+      store.get('autoMatchmakingDelaySeconds'),
+    ),
+    autoMatchmakingWaitForInvitees: store.get('autoMatchmakingWaitForInvitees'),
+  }
+}
+
+function createLobbyAutomationSwitch(label: string, delayText: string) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'sona-lobby-automation-switch'
+  button.innerHTML = `
+    <span class="sona-lobby-automation-label"></span>
+    <span class="sona-lobby-automation-track" aria-hidden="true">
+      <span class="sona-lobby-automation-thumb"></span>
+    </span>
+  `
+  button.querySelector('.sona-lobby-automation-label')!.textContent = `${label} (${delayText})`
+  return button
+}
+
+function createLobbyAutomationExpandButton(label: string) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'sona-lobby-automation-expand'
+  button.setAttribute('aria-label', label)
+  button.innerHTML = '<span class="sona-lobby-automation-expand-icon" aria-hidden="true"></span>'
+  return button
+}
+
+function createLobbyAutomationControls(): { root: HTMLElement; destroy: () => void } {
+  const root = document.createElement('div')
+  root.id = LOBBY_AUTOMATION_ID
+  root.className = 'sona-lobby-automation-controls'
+
+  const acceptGroup = document.createElement('div')
+  acceptGroup.className = 'sona-lobby-automation-group'
+  const acceptRow = document.createElement('div')
+  acceptRow.className = 'sona-lobby-automation-row'
+  const acceptButton = createLobbyAutomationSwitch('', '')
+  const acceptExpandButton = createLobbyAutomationExpandButton(translate('tools.autoAcceptDelay.title'))
+
+  const matchGroup = document.createElement('div')
+  matchGroup.className = 'sona-lobby-automation-group'
+  const matchRow = document.createElement('div')
+  matchRow.className = 'sona-lobby-automation-row'
+
+  const matchButton = createLobbyAutomationSwitch('', '')
+  const expandButton = createLobbyAutomationExpandButton(translate('tools.autoMatchmaking.title'))
+
+  const acceptPanel = document.createElement('div')
+  acceptPanel.className = 'sona-lobby-automation-panel sona-lobby-automation-panel--accept'
+  acceptPanel.innerHTML = `
+    <label class="sona-lobby-automation-field">
+      <span></span>
+      <input class="sona-lobby-automation-input" data-field="accept-delay" type="number" min="0" max="${LOBBY_AUTO_ACCEPT_MAX_DELAY_SECONDS}" step="0.1" />
+    </label>
+  `
+  const acceptDelayInput = acceptPanel.querySelector<HTMLInputElement>('input[data-field="accept-delay"]')!
+  const acceptPanelLabel = acceptPanel.querySelector<HTMLSpanElement>('label > span')!
+
+  const panel = document.createElement('div')
+  panel.className = 'sona-lobby-automation-panel'
+  panel.innerHTML = `
+    <label class="sona-lobby-automation-field">
+      <span></span>
+      <input class="sona-lobby-automation-input" data-field="members" type="number" min="${AUTO_MATCHMAKING_MIN_MEMBERS_MIN}" max="${AUTO_MATCHMAKING_MIN_MEMBERS_MAX}" step="1" />
+    </label>
+    <label class="sona-lobby-automation-field">
+      <span></span>
+      <input class="sona-lobby-automation-input" data-field="delay" type="number" min="0" step="1" />
+    </label>
+    <button class="sona-lobby-automation-mini-switch" data-field="wait" type="button">
+      <span class="sona-lobby-automation-mini-switch-label"></span>
+      <span class="sona-lobby-automation-track" aria-hidden="true">
+        <span class="sona-lobby-automation-thumb"></span>
+      </span>
+    </button>
+  `
+  const memberInput = panel.querySelector<HTMLInputElement>('input[data-field="members"]')!
+  const delayInput = panel.querySelector<HTMLInputElement>('input[data-field="delay"]')!
+  const waitButton = panel.querySelector<HTMLButtonElement>('button[data-field="wait"]')!
+  const panelLabels = panel.querySelectorAll<HTMLSpanElement>('label > span')
+  const waitLabel = waitButton.querySelector<HTMLSpanElement>('.sona-lobby-automation-mini-switch-label')!
+
+  acceptRow.append(acceptButton, acceptExpandButton)
+  matchRow.append(matchButton, expandButton)
+  acceptGroup.append(acceptRow, acceptPanel)
+  matchGroup.append(matchRow, panel)
+  root.append(acceptGroup, matchGroup)
+
+  let acceptPanelOpen = false
+  let matchPanelOpen = false
+  const unsubs: Array<() => void> = []
+
+  const setAcceptPanelOpen = (open: boolean) => {
+    acceptPanelOpen = open
+    if (open) setMatchPanelOpen(false)
+    acceptGroup.classList.toggle('sona-lobby-automation-group--open', acceptPanelOpen)
+    acceptPanel.classList.toggle('sona-lobby-automation-panel--open', acceptPanelOpen)
+    acceptExpandButton.classList.toggle('sona-lobby-automation-expand--open', acceptPanelOpen)
+    acceptExpandButton.setAttribute('aria-expanded', String(acceptPanelOpen))
+  }
+
+  const setMatchPanelOpen = (open: boolean) => {
+    matchPanelOpen = open
+    if (open) setAcceptPanelOpen(false)
+    matchGroup.classList.toggle('sona-lobby-automation-group--open', matchPanelOpen)
+    panel.classList.toggle('sona-lobby-automation-panel--open', matchPanelOpen)
+    expandButton.classList.toggle('sona-lobby-automation-expand--open', matchPanelOpen)
+    expandButton.setAttribute('aria-expanded', String(matchPanelOpen))
+  }
+
+  const sync = () => {
+    const snapshot = getLobbyAutomationSnapshot()
+    const disabled = !snapshot.partyId
+    const showAccept = snapshot.autoAcceptGloballyEnabled
+    const showMatchmaking = snapshot.autoMatchmakingGloballyEnabled
+
+    root.classList.toggle('sona-lobby-automation-controls--empty', !showAccept && !showMatchmaking)
+    root.classList.toggle('sona-lobby-automation-controls--disabled', disabled)
+    acceptGroup.style.display = showAccept ? 'block' : 'none'
+    matchGroup.style.display = showMatchmaking ? 'block' : 'none'
+    acceptButton.disabled = disabled || !showAccept
+    acceptExpandButton.disabled = disabled || !showAccept
+    matchButton.disabled = disabled || !showMatchmaking
+    expandButton.disabled = disabled || !showMatchmaking
+    if (!showAccept) setAcceptPanelOpen(false)
+    if (!showMatchmaking) setMatchPanelOpen(false)
+
+    acceptButton.classList.toggle('sona-lobby-automation-switch--on', snapshot.autoAcceptEnabled)
+    matchButton.classList.toggle('sona-lobby-automation-switch--on', snapshot.autoMatchmakingEnabled)
+
+    acceptButton.querySelector('.sona-lobby-automation-label')!.textContent =
+      `${translate('tools.autoAccept.title')} (${formatLobbySeconds(snapshot.autoAcceptDelaySeconds)})`
+    matchButton.querySelector('.sona-lobby-automation-label')!.textContent =
+      `${translate('tools.autoMatchmaking.title')} (${formatLobbySeconds(snapshot.autoMatchmakingDelaySeconds)})`
+
+    acceptDelayInput.value = String(snapshot.autoAcceptDelaySeconds)
+    memberInput.value = String(snapshot.autoMatchmakingMinimumMembers)
+    delayInput.value = String(snapshot.autoMatchmakingDelaySeconds)
+    waitButton.classList.toggle('sona-lobby-automation-mini-switch--on', snapshot.autoMatchmakingWaitForInvitees)
+
+    acceptPanelLabel.textContent = translate('tools.autoAcceptDelay.title')
+    panelLabels[0].textContent = translate('tools.autoMatchmaking.minimumMembers.title')
+    panelLabels[1].textContent = translate('tools.autoMatchmaking.delay.title')
+    waitLabel.textContent = translate('tools.autoMatchmaking.waitForInvitees.title')
+  }
+
+  const preventLeagueHeaderClickThrough = (event: Event) => {
+    event.stopPropagation()
+  }
+
+  root.addEventListener('mousedown', preventLeagueHeaderClickThrough)
+  root.addEventListener('mouseup', preventLeagueHeaderClickThrough)
+  root.addEventListener('click', preventLeagueHeaderClickThrough)
+
+  acceptButton.addEventListener('click', () => {
+    const snapshot = getLobbyAutomationSnapshot()
+    store.set('lobbyHeaderAutoAcceptEnabled', !snapshot.autoAcceptEnabled)
+  })
+
+  matchButton.addEventListener('click', () => {
+    const snapshot = getLobbyAutomationSnapshot()
+    store.set('lobbyHeaderAutoMatchmakingEnabled', !snapshot.autoMatchmakingEnabled)
+  })
+
+  acceptExpandButton.addEventListener('click', () => {
+    setAcceptPanelOpen(!acceptPanelOpen)
+  })
+
+  expandButton.addEventListener('click', () => {
+    setMatchPanelOpen(!matchPanelOpen)
+  })
+
+  acceptDelayInput.addEventListener('change', () => {
+    setAutoAcceptDelayByMaxSeconds(normalizeAutoAcceptDelaySeconds(acceptDelayInput.value))
+  })
+
+  memberInput.addEventListener('change', () => {
+    store.set('autoMatchmakingMinimumMembers', normalizeLobbyMemberCount(memberInput.value))
+  })
+
+  delayInput.addEventListener('change', () => {
+    store.set('autoMatchmakingDelaySeconds', normalizeLobbyDelaySeconds(delayInput.value))
+  })
+
+  waitButton.addEventListener('click', () => {
+    store.set('autoMatchmakingWaitForInvitees', !store.get('autoMatchmakingWaitForInvitees'))
+  })
+
+  const onDocumentMouseDown = (event: MouseEvent) => {
+    if (!root.contains(event.target as Node)) {
+      setAcceptPanelOpen(false)
+      setMatchPanelOpen(false)
+    }
+  }
+  document.addEventListener('mousedown', onDocumentMouseDown, true)
+
+  unsubs.push(
+    onLobbyTempSettingsChange(sync),
+    store.onChange('autoAcceptMatch', sync),
+    store.onChange('lobbyHeaderAutoAcceptEnabled', sync),
+    store.onChange('autoAcceptDelayMax', sync),
+    store.onChange('autoMatchmaking', sync),
+    store.onChange('lobbyHeaderAutoMatchmakingEnabled', sync),
+    store.onChange('autoMatchmakingMinimumMembers', sync),
+    store.onChange('autoMatchmakingDelaySeconds', sync),
+    store.onChange('autoMatchmakingWaitForInvitees', sync),
+    store.onChange('locale', sync),
+  )
+
+  sync()
+
+  return {
+    root,
+    destroy: () => {
+      document.removeEventListener('mousedown', onDocumentMouseDown, true)
+      unsubs.forEach((unsubscribe) => unsubscribe())
+      root.remove()
+    },
+  }
+}
+
+function tryInjectLobbyAutomationControls(): boolean {
+  if (lobbyAutomationController?.root.isConnected) return true
+  if (lobbyAutomationController) {
+    lobbyAutomationController.destroy()
+    lobbyAutomationController = null
+  }
+
+  const container = document.querySelector('.lobby-header-buttons-container')
+  if (!container) return false
+
+  lobbyAutomationController = createLobbyAutomationControls()
+  container.prepend(lobbyAutomationController.root)
+  logger.info('[LobbyAutomation] Header temporary controls injected')
+  return true
+}
+
 export function registerAllInjections() {
   injector.register(tryInjectSonaButton)
+  injector.register(tryInjectLobbyAutomationControls)
   injector.register(tryPatchNotificationPip)
   // tryHijackAvailabilityHitbox 由 features.ts 的 unlockAvailability 开关按需注册
 

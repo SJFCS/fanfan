@@ -340,29 +340,10 @@ export function AutomationPage() {
           title={t('tools.autoAccept.title')}
           description={t('tools.autoAccept.description')}
         >
-          {autoAccept && (
-            <div className="sona-auto-accept-delay-row">
-              <div className="sona-auto-accept-delay-input">
-                <SonaInput
-                  {...autoAcceptDelayInputProps}
-                  value={autoAcceptDelayMax}
-                  onChange={(v) => {
-                    const cleaned = cleanAutoAcceptDelaySecondsInput(v)
-                    const maxSeconds = normalizeAutoAcceptDelaySeconds(cleaned)
-                    setAutoAcceptDelayMax(cleaned)
-                    setAutoAcceptDelayRangeByMaxSeconds(maxSeconds)
-                  }}
-                  placeholder="最大"
-                />
-              </div>
-              <span className="sona-auto-accept-delay-unit">{t('tools.autoAcceptDelay.unit')}</span>
-            </div>
-          )}
           <SonaSwitch
             checked={autoAccept}
             onChange={(v) => {
               setAutoAccept(v)
-              if (v) setAutoAcceptDelayRangeByMaxSeconds(normalizeAutoAcceptDelaySeconds(autoAcceptDelayMax))
               store.set('autoAcceptMatch', v)
             }}
           />
@@ -395,56 +376,6 @@ export function AutomationPage() {
             onChange={handleAutoMatchmakingChange}
           />
         </SettingCard>
-        {autoMatchmaking && (
-          <div className="sona-setting-switch-panel">
-            <div className="sona-setting-panel-section">
-              <SettingCard
-                title={t('tools.autoMatchmaking.minimumMembers.title')}
-                description={t('tools.autoMatchmaking.minimumMembers.description', {
-                  min: AUTO_MATCHMAKING_MIN_MEMBERS_MIN,
-                  max: AUTO_MATCHMAKING_MIN_MEMBERS_MAX,
-                })}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 80 }}>
-                    <SonaInput
-                      value={autoMatchmakingMinimumMembers}
-                      onChange={handleMinimumMembersChange}
-                      onBlur={normalizeAutoMatchmakingInputs}
-                      placeholder="1"
-                    />
-                  </div>
-                  <span style={{ color: '#a09b8c', fontSize: 13 }}>{t('tools.autoMatchmaking.minimumMembers.unit')}</span>
-                </div>
-              </SettingCard>
-              <SettingCard
-                title={t('tools.autoMatchmaking.delay.title')}
-                description={t('tools.autoMatchmaking.delay.description')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 80 }}>
-                    <SonaInput
-                      value={autoMatchmakingDelaySeconds}
-                      onChange={handleMatchmakingDelayChange}
-                      onBlur={normalizeAutoMatchmakingInputs}
-                      placeholder="5"
-                    />
-                  </div>
-                  <span style={{ color: '#a09b8c', fontSize: 13 }}>{t('tools.autoMatchmaking.delay.unit')}</span>
-                </div>
-              </SettingCard>
-              <SettingCard
-                title={t('tools.autoMatchmaking.waitForInvitees.title')}
-                description={t('tools.autoMatchmaking.waitForInvitees.description')}
-              >
-                <SonaSwitch
-                  checked={autoMatchmakingWaitForInvitees}
-                  onChange={(v) => { setAutoMatchmakingWaitForInvitees(v); store.set('autoMatchmakingWaitForInvitees', v) }}
-                />
-              </SettingCard>
-            </div>
-          </div>
-        )}
       </SettingGroup>
       <SettingGroup title={t('tools.group.champSelectAutomation')}>
         <SettingCard
