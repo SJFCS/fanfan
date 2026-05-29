@@ -277,12 +277,13 @@ function getStatsOverlaySegments(stats: LobbyMemberStats): StatsOverlaySegment[]
     return [
       { text: ratingText, color: '#c8aa6e' },
       { text: `胜率 ${winRateText}`, color: getRateColor(stats.winRate) },
+      { text: `评分 ${scoreText}`, color: stats.score != null ? getScoreColor(stats.score) : '#a09b8c' },
     ]
   }
 
   return [
-    { text: ratingText, color: '#c8aa6e' },
     { text: `胜率 ${winRateText}`, color: getRateColor(stats.winRate) },
+    { text: `KDA ${kdaText}`, color: getKdaColor(stats.kda) },
     { text: `评分 ${scoreText}`, color: stats.score != null ? getScoreColor(stats.score) : '#a09b8c' },
   ]
 }
