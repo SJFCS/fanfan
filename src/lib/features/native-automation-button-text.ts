@@ -29,16 +29,19 @@ let textSyncUnsubs: Array<() => void> = []
 interface ManagedTextState {
   fallbackText: string
   lastWrittenText: string | null
+  originalText: string | null
 }
 
 const findMatchTextState: ManagedTextState = {
   fallbackText: '寻找对局',
   lastWrittenText: null,
+  originalText: null,
 }
 
 const readyCheckAcceptTextState: ManagedTextState = {
   fallbackText: '接受！',
   lastWrittenText: null,
+  originalText: null,
 }
 
 function formatSeconds(milliseconds: number) {
@@ -59,6 +62,9 @@ function setManagedText(element: Element | null, state: ManagedTextState, text: 
 
   const textNode = findWritableTextNode(element)
   if (textNode) {
+    if (state.originalText === null && textNode.textContent !== state.lastWrittenText) {
+      state.originalText = textNode.textContent ?? ''
+    }
     if (textNode.textContent !== text) {
       textNode.textContent = text
     }
@@ -73,14 +79,16 @@ function setManagedText(element: Element | null, state: ManagedTextState, text: 
 function releaseManagedText(element: Element | null, state: ManagedTextState) {
   if (!element || !state.lastWrittenText) {
     state.lastWrittenText = null
+    state.originalText = null
     return
   }
 
   const textNode = findWritableTextNode(element)
   if (textNode?.textContent === state.lastWrittenText) {
-    textNode.textContent = state.fallbackText
+    textNode.textContent = state.originalText ?? state.fallbackText
   }
   state.lastWrittenText = null
+  state.originalText = null
 }
 
 function getLowPriorityPenaltyRemainingMs() {
@@ -163,7 +171,7 @@ function syncNativeAutomationButtonText() {
   const shouldWaitForPenaltyStatus =
     isAutoMatchmakingEnabledForCurrentLobby() && !lowPriorityPenaltyStatusLoaded
   if (penaltyRemainingMs <= 0 && !shouldWaitForPenaltyStatus) {
-    if (isAutoMatchmakingEnabledForCurrentLobby()) {
+    if (isAutoMatchmakingEnabledForCurrentLobby() && isAutoMatchmakingCountdownActive()) {
       setManagedText(findMatchText, findMatchTextState, getAutoMatchmakingButtonText())
     } else {
       releaseManagedText(findMatchText, findMatchTextState)
@@ -171,7 +179,7 @@ function syncNativeAutomationButtonText() {
   }
 
   const readyCheckAccept = document.querySelector(READY_CHECK_ACCEPT_SELECTOR)
-  if (isAutoAcceptEnabledForCurrentLobby()) {
+  if (isAutoAcceptEnabledForCurrentLobby() && getAutoAcceptCountdownMs() !== null) {
     setManagedText(readyCheckAccept, readyCheckAcceptTextState, getAutoAcceptButtonText())
   } else {
     releaseManagedText(readyCheckAccept, readyCheckAcceptTextState)
@@ -222,6 +230,8 @@ export function stopNativeAutomationButtonText() {
   penaltyRefreshInFlight = false
   lowPriorityPenaltyStatusLoaded = false
   findMatchTextState.lastWrittenText = null
+  findMatchTextState.originalText = null
   readyCheckAcceptTextState.lastWrittenText = null
+  readyCheckAcceptTextState.originalText = null
   installed = false
 }
