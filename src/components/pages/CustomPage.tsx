@@ -14,6 +14,8 @@ import { SonaSelect } from '@/components/ui/SonaSelect'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp', 'ico'])
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'ogg', 'ogv', 'mov', 'm4v'])
+const SORTABLE_WALLPAPER_MIME = 'application/x-sona-wallpaper-asset'
+const SORTABLE_AVATAR_MIME = 'application/x-sona-avatar-asset'
 const DRAG_SCROLL_EDGE_SIZE = 76
 const DRAG_SCROLL_MAX_SPEED = 20
 const DEFAULT_WALLPAPER_ADJUSTMENT = { scale: 1, offsetX: 0, offsetY: 0 }
@@ -63,6 +65,13 @@ interface PendingSharedAssetRemoval {
   source: 'wallpaper' | 'avatar'
 }
 
+type SortableAssetSource = 'wallpaper' | 'avatar'
+
+interface SortableAssetDrag {
+  source: SortableAssetSource
+  assetPath: string
+}
+
 function isImageFile(fileName: string): boolean {
   const ext = fileName.split('.').pop()?.toLowerCase()
   return Boolean(ext && IMAGE_EXTENSIONS.has(ext))
@@ -100,6 +109,11 @@ function normalizeAssetPath(value: string): string {
     .replace(/^\/+/, '')
 }
 
+function getAssetDisplayName(assetPath: string): string {
+  const fileName = assetPath.split('/').pop() || assetPath
+  return fileName.replace(/\.[^.]+$/, '')
+}
+
 function getAssetUrl(assetPath: string, root: PluginAssetRoot): string {
   return resolvePluginAssetUrl(assetPath, root)
 }
@@ -130,6 +144,21 @@ function getAvatarPreviewTop(adjustment: AvatarAdjustment): string {
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
+}
+
+function moveAssetPath(paths: string[], draggedPath: string, targetPath: string) {
+  const fromIndex = paths.indexOf(draggedPath)
+  const toIndex = paths.indexOf(targetPath)
+  if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return paths
+
+  const nextPaths = [...paths]
+  const [movedPath] = nextPaths.splice(fromIndex, 1)
+  nextPaths.splice(toIndex, 0, movedPath)
+  return nextPaths
+}
+
+function getSortableAssetMime(source: SortableAssetSource) {
+  return source === 'wallpaper' ? SORTABLE_WALLPAPER_MIME : SORTABLE_AVATAR_MIME
 }
 
 function getWallpaperOffsetLimit(
@@ -196,6 +225,7 @@ export function CustomPage() {
   const wallpaperDragStartRef = useRef<WallpaperDragStart | null>(null)
   const dragScrollFrameRef = useRef<number | null>(null)
   const dragPointerYRef = useRef<number | null>(null)
+  const sortableAssetDragRef = useRef<SortableAssetDrag | null>(null)
   const avatarSyncTimerRef = useRef<number | null>(null)
   const avatarAdjustFrameRef = useRef<HTMLDivElement>(null)
   const avatarDragStartRef = useRef<AvatarDragStart | null>(null)
@@ -231,6 +261,8 @@ export function CustomPage() {
   const [showHomepageBackgroundInput, setShowHomepageBackgroundInput] = useState(false)
   const [isAvatarDropActive, setIsAvatarDropActive] = useState(false)
   const [showAvatarInput, setShowAvatarInput] = useState(false)
+  const [draggingSortableAsset, setDraggingSortableAsset] = useState<SortableAssetDrag | null>(null)
+  const [dragOverSortableAsset, setDragOverSortableAsset] = useState<SortableAssetDrag | null>(null)
 
   const saveAssetPaths = (paths: string[]) => {
     setAssetPaths(paths)
@@ -833,6 +865,71 @@ export function CustomPage() {
     scheduleCustomAvatarSync(assetPath)
   }
 
+  const clearSortableAssetDrag = () => {
+    sortableAssetDragRef.current = null
+    setDraggingSortableAsset(null)
+    setDragOverSortableAsset(null)
+  }
+
+  const reorderSortableAssetPath = (source: SortableAssetSource, targetPath: string) => {
+    const draggingAsset = sortableAssetDragRef.current
+    if (!draggingAsset || draggingAsset.source !== source || draggingAsset.assetPath === targetPath) return
+
+    if (source === 'wallpaper') {
+      const nextPaths = moveAssetPath(homepageBackgroundAssetPaths, draggingAsset.assetPath, targetPath)
+      if (nextPaths !== homepageBackgroundAssetPaths) saveHomepageBackgroundAssetPaths(nextPaths)
+      return
+    }
+
+    const currentActivePath = customAvatarActiveAssetPath ?? customAvatarAssetPaths[0] ?? null
+    const nextPaths = moveAssetPath(customAvatarAssetPaths, draggingAsset.assetPath, targetPath)
+    if (nextPaths === customAvatarAssetPaths) return
+
+    saveCustomAvatarAssetPaths(nextPaths)
+    if (!customAvatarActiveAssetPath && currentActivePath) {
+      saveCustomAvatarActiveAssetPath(currentActivePath)
+    }
+  }
+
+  const handleSortableAssetDragStart = (
+    event: DragEvent<HTMLDivElement>,
+    source: SortableAssetSource,
+    assetPath: string,
+  ) => {
+    const draggingAsset = { source, assetPath }
+    sortableAssetDragRef.current = draggingAsset
+    setDraggingSortableAsset(draggingAsset)
+    setDragOverSortableAsset(null)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData(getSortableAssetMime(source), assetPath)
+  }
+
+  const handleSortableAssetDragOver = (
+    event: DragEvent<HTMLDivElement>,
+    source: SortableAssetSource,
+    targetPath: string,
+  ) => {
+    const draggingAsset = sortableAssetDragRef.current
+    if (!draggingAsset) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = draggingAsset.source === source ? 'move' : 'none'
+    if (draggingAsset.source !== source) return
+
+    setDragOverSortableAsset({ source, assetPath: targetPath })
+    reorderSortableAssetPath(source, targetPath)
+  }
+
+  const handleSortableAssetDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!sortableAssetDragRef.current) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    clearSortableAssetDrag()
+    stopDragAutoScroll()
+  }
+
   const stopDragAutoScroll = () => {
     dragPointerYRef.current = null
     setIsHomepageBackgroundDropActive(false)
@@ -877,6 +974,11 @@ export function CustomPage() {
 
   const handleAvatarDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
+    if (sortableAssetDragRef.current) {
+      event.stopPropagation()
+      event.dataTransfer.dropEffect = sortableAssetDragRef.current.source === 'avatar' ? 'move' : 'none'
+      return
+    }
     event.dataTransfer.dropEffect = 'copy'
     setIsAvatarDropActive(true)
     updateDragAutoScroll(event.clientY)
@@ -890,6 +992,11 @@ export function CustomPage() {
 
   const handleHomepageBackgroundDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
+    if (sortableAssetDragRef.current) {
+      event.stopPropagation()
+      event.dataTransfer.dropEffect = sortableAssetDragRef.current.source === 'wallpaper' ? 'move' : 'none'
+      return
+    }
     event.dataTransfer.dropEffect = 'copy'
     setIsHomepageBackgroundDropActive(true)
     updateDragAutoScroll(event.clientY)
@@ -905,6 +1012,10 @@ export function CustomPage() {
     event.preventDefault()
     setIsHomepageBackgroundDropActive(false)
     stopDragAutoScroll()
+    if (sortableAssetDragRef.current) {
+      clearSortableAssetDrag()
+      return
+    }
     const assetPath = event.dataTransfer.getData('text/plain')
     addHomepageBackgroundAssetPath(assetPath)
   }
@@ -913,6 +1024,10 @@ export function CustomPage() {
     event.preventDefault()
     setIsAvatarDropActive(false)
     stopDragAutoScroll()
+    if (sortableAssetDragRef.current) {
+      clearSortableAssetDrag()
+      return
+    }
     const assetPath = event.dataTransfer.getData('text/plain')
     addCustomAvatarAssetPath(assetPath)
   }
@@ -973,10 +1088,20 @@ export function CustomPage() {
                           className={[
                             'sona-avatar-card',
                             isApplied ? 'sona-avatar-card--applied' : '',
+                            draggingSortableAsset?.source === 'avatar' && draggingSortableAsset.assetPath === assetPath ? 'sona-sortable-card--dragging' : '',
+                            dragOverSortableAsset?.source === 'avatar' && dragOverSortableAsset.assetPath === assetPath ? 'sona-sortable-card--over' : '',
                           ].filter(Boolean).join(' ')}
                           key={assetPath}
                           role="button"
                           tabIndex={0}
+                          draggable
+                          onDragStart={(event) => handleSortableAssetDragStart(event, 'avatar', assetPath)}
+                          onDragOver={(event) => handleSortableAssetDragOver(event, 'avatar', assetPath)}
+                          onDrop={handleSortableAssetDrop}
+                          onDragEnd={() => {
+                            clearSortableAssetDrag()
+                            stopDragAutoScroll()
+                          }}
                           onClick={() => applyCustomAvatarAssetPath(assetPath)}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
@@ -1022,7 +1147,7 @@ export function CustomPage() {
                               />
                             </div>
                           </div>
-                          <span className="sona-avatar-card-name">{assetPath}</span>
+                          <span className="sona-avatar-card-name" title={assetPath}>{getAssetDisplayName(assetPath)}</span>
                           <span className="sona-avatar-card-action">{t('beautify.wallpaper.clickApply')}</span>
                         </div>
                       )
@@ -1146,10 +1271,20 @@ export function CustomPage() {
                           className={[
                             'sona-wallpaper-card',
                             isApplied ? 'sona-wallpaper-card--applied' : '',
+                            draggingSortableAsset?.source === 'wallpaper' && draggingSortableAsset.assetPath === assetPath ? 'sona-sortable-card--dragging' : '',
+                            dragOverSortableAsset?.source === 'wallpaper' && dragOverSortableAsset.assetPath === assetPath ? 'sona-sortable-card--over' : '',
                           ].filter(Boolean).join(' ')}
                           key={assetPath}
                           role="button"
                           tabIndex={0}
+                          draggable
+                          onDragStart={(event) => handleSortableAssetDragStart(event, 'wallpaper', assetPath)}
+                          onDragOver={(event) => handleSortableAssetDragOver(event, 'wallpaper', assetPath)}
+                          onDrop={handleSortableAssetDrop}
+                          onDragEnd={() => {
+                            clearSortableAssetDrag()
+                            stopDragAutoScroll()
+                          }}
                           onClick={() => applyHomepageBackgroundAssetPath(assetPath)}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
@@ -1202,7 +1337,7 @@ export function CustomPage() {
                           ) : (
                             <img src={getAssetUrl(assetPath, 'wallpapers')} alt={assetPath} />
                           )}
-                          <span className="sona-wallpaper-card-name">{assetPath}</span>
+                          <span className="sona-wallpaper-card-name" title={assetPath}>{getAssetDisplayName(assetPath)}</span>
                           <span className="sona-wallpaper-card-action">{t('beautify.wallpaper.clickApply')}</span>
                         </div>
                       )
