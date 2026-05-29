@@ -95,18 +95,22 @@ function toFiniteNumber(value: unknown) {
   return Number.isFinite(numberValue) ? numberValue : 0
 }
 
+export async function getLowPriorityPenaltyRemainingSeconds(): Promise<number> {
+  const search = await lcu.getMatchSearchResult()
+  const searchPenalty = toFiniteNumber(search.lowPriorityData?.penaltyTimeRemaining)
+  const errorPenalty = search.errors.reduce<number>((max, error) => {
+    const penaltyTimeRemaining = typeof error === 'object' && error && 'penaltyTimeRemaining' in error
+      ? toFiniteNumber((error as { penaltyTimeRemaining?: unknown }).penaltyTimeRemaining)
+      : 0
+    return Math.max(max, penaltyTimeRemaining)
+  }, 0)
+
+  return Math.max(searchPenalty, errorPenalty)
+}
+
 async function getLowPriorityPenaltyStatus(): Promise<'penalized' | 'clear' | 'unavailable'> {
   try {
-    const search = await lcu.getMatchSearchResult()
-    const searchPenalty = toFiniteNumber(search.lowPriorityData?.penaltyTimeRemaining)
-    const errorPenalty = search.errors.reduce<number>((max, error) => {
-      const penaltyTimeRemaining = typeof error === 'object' && error && 'penaltyTimeRemaining' in error
-        ? toFiniteNumber((error as { penaltyTimeRemaining?: unknown }).penaltyTimeRemaining)
-        : 0
-      return Math.max(max, penaltyTimeRemaining)
-    }, 0)
-
-    return Math.max(searchPenalty, errorPenalty) > 0 ? 'penalized' : 'clear'
+    return await getLowPriorityPenaltyRemainingSeconds() > 0 ? 'penalized' : 'clear'
   } catch (err) {
     if (isLcuStatusError(err, 404)) {
       return 'clear'
