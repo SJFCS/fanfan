@@ -28,6 +28,7 @@ function escapeCssUrl(value: string): string {
 
 let currentAssetPath: string | null = null
 let adjustments: Record<string, HomepageBackgroundAdjustment> = {}
+let isHomepageBackgroundVideoSuspended = false
 let glassConfig: BeautifyGlassConfig = {
   blur: 0,
   opacity: 0,
@@ -116,6 +117,10 @@ function ensureHomepageBackgroundVideo() {
   if (video.getAttribute('src') !== assetUrl) {
     video.src = assetUrl
   }
+  if (isHomepageBackgroundVideoSuspended) {
+    video.pause()
+    return
+  }
   void video.play().catch(() => {})
 }
 
@@ -165,5 +170,21 @@ export function updateBeautifyHomepageBackgroundAdjustments(nextAdjustments: Rec
   adjustments = nextAdjustments
   if (registered) {
     ensureHomepageBackgroundStyle()
+  }
+}
+
+export function setBeautifyHomepageBackgroundVideoSuspended(suspended: boolean) {
+  isHomepageBackgroundVideoSuspended = suspended
+
+  const video = document.querySelector<HTMLVideoElement>(`${VIEWPORT_ROOT_SELECTOR} > video[${HOMEPAGE_VIDEO_ATTR}]`)
+  if (!video) return
+
+  if (suspended) {
+    video.pause()
+    return
+  }
+
+  if (currentAssetPath && isVideoAsset(currentAssetPath)) {
+    void video.play().catch(() => {})
   }
 }

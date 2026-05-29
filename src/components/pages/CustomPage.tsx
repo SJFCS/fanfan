@@ -6,6 +6,7 @@ import { SonaInput } from '@/components/ui/SonaInput'
 import { SonaSlider } from '@/components/ui/SonaSlider'
 import { SonaSwitch } from '@/components/ui/SonaSwitch'
 import { createCustomAvatarImageBlob, syncCustomAvatarAssetPath } from '@/lib/features/beautify-client/custom-avatar'
+import { setBeautifyHomepageBackgroundVideoSuspended } from '@/lib/features/beautify-client/homepage-background'
 import { getPluginAssetsFolderPath, resolvePluginAssetUrl, withPluginAssetRoot, type PluginAssetRoot } from '@/lib/plugin-resolver'
 import { store } from '@/lib/store'
 import { useI18n } from '@/i18n'
@@ -263,6 +264,17 @@ export function CustomPage() {
   const [showAvatarInput, setShowAvatarInput] = useState(false)
   const [draggingSortableAsset, setDraggingSortableAsset] = useState<SortableAssetDrag | null>(null)
   const [dragOverSortableAsset, setDragOverSortableAsset] = useState<SortableAssetDrag | null>(null)
+
+  useEffect(() => {
+    const shouldSuspendBackgroundVideo = Boolean(editingWallpaperAssetPath && isVideoFile(editingWallpaperAssetPath))
+    setBeautifyHomepageBackgroundVideoSuspended(shouldSuspendBackgroundVideo)
+
+    return () => {
+      if (shouldSuspendBackgroundVideo) {
+        setBeautifyHomepageBackgroundVideoSuspended(false)
+      }
+    }
+  }, [editingWallpaperAssetPath])
 
   const saveAssetPaths = (paths: string[]) => {
     setAssetPaths(paths)
@@ -1525,11 +1537,12 @@ export function CustomPage() {
                     <video
                       key={`wallpaper-video-${editingWallpaperAssetPath}`}
                       src={getAssetUrl(editingWallpaperAssetPath, 'wallpapers')}
+                      poster={getAssetUrl(getVideoPosterAssetPath(editingWallpaperAssetPath), 'wallpapers')}
                       muted
                       loop
                       autoPlay
                       playsInline
-                      preload="auto"
+                      preload="metadata"
                       onLoadedMetadata={(event) =>
                         updateWallpaperMediaSize(
                           editingWallpaperAssetPath,

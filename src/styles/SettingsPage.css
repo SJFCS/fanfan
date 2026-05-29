@@ -445,8 +445,8 @@
 
 .sona-wallpaper-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  max-height: 288px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-height: 282px;
   overflow-y: auto;
   padding-right: 6px;
   gap: 10px;
