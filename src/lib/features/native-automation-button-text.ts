@@ -14,10 +14,12 @@ import {
 const FIND_MATCH_TEXT_SELECTOR = '.find-match-button .button-text'
 const READY_CHECK_ACCEPT_SELECTOR = '.ready-check-button-accept'
 const LOW_PRIORITY_PENALTY_POLL_MS = 1000
+const COUNTDOWN_RENDER_POLL_MS = 100
 
 let textSyncTimer: ReturnType<typeof setInterval> | null = null
+let countdownRenderTimer: ReturnType<typeof setInterval> | null = null
 let textSyncObserver: MutationObserver | null = null
-let textSyncFrame = 0
+let syncScheduled = false
 let installed = false
 let penaltyRefreshInFlight = false
 let lowPriorityPenaltyStatusLoaded = false
@@ -108,7 +110,7 @@ async function refreshLowPriorityPenalty() {
     lowPriorityPenaltyStatusLoaded = true
     penaltyRefreshInFlight = false
     if (installed) {
-      syncNativeAutomationButtonText()
+      scheduleSync()
     }
   }
 }
@@ -125,6 +127,34 @@ function getAutoMatchmakingButtonText() {
     : null
   const delayMs = countdownMs ?? getAutoMatchmakingConfiguredDelayMs()
   return `自动匹配 (${formatSeconds(delayMs)})`
+}
+
+function shouldRenderCountdown() {
+  return Boolean(
+    (isAutoAcceptEnabledForCurrentLobby() && getAutoAcceptCountdownMs() !== null)
+    || (isAutoMatchmakingEnabledForCurrentLobby() && isAutoMatchmakingCountdownActive()),
+  )
+}
+
+function updateCountdownRenderTimer() {
+  const shouldStart = shouldRenderCountdown()
+  if (shouldStart && !countdownRenderTimer) {
+    countdownRenderTimer = setInterval(scheduleSync, COUNTDOWN_RENDER_POLL_MS)
+  } else if (!shouldStart && countdownRenderTimer) {
+    clearInterval(countdownRenderTimer)
+    countdownRenderTimer = null
+  }
+}
+
+function scheduleSync() {
+  if (syncScheduled || !installed) return
+  syncScheduled = true
+  requestAnimationFrame(() => {
+    syncScheduled = false
+    if (!installed) return
+    syncNativeAutomationButtonText()
+    updateCountdownRenderTimer()
+  })
 }
 
 function syncNativeAutomationButtonText() {
@@ -148,53 +178,41 @@ function syncNativeAutomationButtonText() {
   }
 }
 
-function startNativeAutomationButtonTextSyncLoop() {
-  const tick = () => {
-    syncNativeAutomationButtonText()
-    textSyncFrame = requestAnimationFrame(tick)
-  }
-
-  if (!textSyncFrame) {
-    textSyncFrame = requestAnimationFrame(tick)
-  }
-}
-
 export function initNativeAutomationButtonText() {
   if (installed) return
   installed = true
 
-  syncNativeAutomationButtonText()
-  startNativeAutomationButtonTextSyncLoop()
+  scheduleSync()
   void refreshLowPriorityPenalty()
   textSyncTimer = setInterval(() => {
     void refreshLowPriorityPenalty()
   }, LOW_PRIORITY_PENALTY_POLL_MS)
-  textSyncObserver = new MutationObserver(syncNativeAutomationButtonText)
+  textSyncObserver = new MutationObserver(scheduleSync)
   textSyncObserver.observe(document.body, {
-    characterData: true,
     childList: true,
     subtree: true,
   })
 
   textSyncUnsubs = [
-    store.onChange('autoAcceptMatch', syncNativeAutomationButtonText),
-    store.onChange('lobbyHeaderAutoAcceptEnabled', syncNativeAutomationButtonText),
-    store.onChange('autoAcceptDelayMin', syncNativeAutomationButtonText),
-    store.onChange('autoAcceptDelayMax', syncNativeAutomationButtonText),
-    store.onChange('autoMatchmaking', syncNativeAutomationButtonText),
-    store.onChange('lobbyHeaderAutoMatchmakingEnabled', syncNativeAutomationButtonText),
-    store.onChange('autoMatchmakingDelaySeconds', syncNativeAutomationButtonText),
+    store.onChange('autoAcceptMatch', scheduleSync),
+    store.onChange('lobbyHeaderAutoAcceptEnabled', scheduleSync),
+    store.onChange('autoAcceptDelayMin', scheduleSync),
+    store.onChange('autoAcceptDelayMax', scheduleSync),
+    store.onChange('autoMatchmaking', scheduleSync),
+    store.onChange('lobbyHeaderAutoMatchmakingEnabled', scheduleSync),
+    store.onChange('autoMatchmakingDelaySeconds', scheduleSync),
   ]
 }
 
 export function stopNativeAutomationButtonText() {
-  if (textSyncFrame) {
-    cancelAnimationFrame(textSyncFrame)
-    textSyncFrame = 0
-  }
+  syncScheduled = false
   if (textSyncTimer) {
     clearInterval(textSyncTimer)
     textSyncTimer = null
+  }
+  if (countdownRenderTimer) {
+    clearInterval(countdownRenderTimer)
+    countdownRenderTimer = null
   }
   textSyncUnsubs.forEach((unsubscribe) => unsubscribe())
   textSyncUnsubs = []
