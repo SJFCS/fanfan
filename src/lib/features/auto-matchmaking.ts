@@ -14,6 +14,7 @@ let autoMatchmakingRunId = 0
 let autoMatchmakingEvaluateId = 0
 let autoMatchmakingInFlight = false
 let lastBlockedReason: MatchmakingBlockedReason | null = null
+let lastObservedQueueId = 0
 
 type MatchmakingBlockedReason =
   | 'not-in-lobby'
@@ -43,6 +44,15 @@ function getMinimumMembers() {
     AUTO_MATCHMAKING_MIN_MEMBERS_MIN,
     Math.min(AUTO_MATCHMAKING_MIN_MEMBERS_MAX, Math.floor(value)),
   )
+}
+
+async function getCurrentLobbyQueueId() {
+  try {
+    const lobby = await lcu.getLobby()
+    return lobby.gameConfig?.queueId ?? 0
+  } catch {
+    return 0
+  }
 }
 
 function getDelayMs() {
@@ -88,6 +98,14 @@ function resetAutoMatchmakingRuntime() {
   autoMatchmakingEvaluateId++
   autoMatchmakingInFlight = false
   lastBlockedReason = null
+}
+
+function resetAutoMatchmakingTimer(reason: string) {
+  if (autoMatchmakingTimer) {
+    logger.info('[AutoMatchmaking] %s，重置自动匹配倒计时', reason)
+  }
+  clearAutoMatchmakingTimer()
+  autoMatchmakingRunId++
 }
 
 function toFiniteNumber(value: unknown) {
@@ -259,17 +277,32 @@ export function updateAutoMatchmaking(enabled: boolean) {
   if (enabled && autoMatchmakingUnsubs.length === 0) {
     autoMatchmakingUnsubs = [
       onAutoReturnedToLobby(() => refreshAutoMatchmaking('自动返回房间完成')),
-      lcu.observe(LcuEventUri.LOBBY, () => {
+      lcu.observe(LcuEventUri.LOBBY, async () => {
+        const queueId = await getCurrentLobbyQueueId()
+        if (queueId !== lastObservedQueueId) {
+          lastObservedQueueId = queueId
+          resetAutoMatchmakingTimer('房间模式切换')
+          refreshAutoMatchmaking('房间模式切换', true)
+          return
+        }
+
         refreshAutoMatchmaking('房间状态变化')
       }),
       lcu.observe(LcuEventUri.GAMEFLOW_PHASE_CHANGE, (event: LCUEventMessage) => {
         if ((event.data as GameflowPhase) === 'Lobby') {
+          void getCurrentLobbyQueueId().then((queueId) => {
+            lastObservedQueueId = queueId
+          })
           refreshAutoMatchmaking('进入房间')
         } else {
+          lastObservedQueueId = 0
           cancelScheduledMatchmaking('not-in-lobby')
         }
       }),
     ]
+    void getCurrentLobbyQueueId().then((queueId) => {
+      lastObservedQueueId = queueId
+    })
     refreshAutoMatchmaking('自动匹配已开启')
     logger.info('Auto matchmaking enabled OK')
   } else if (!enabled && autoMatchmakingUnsubs.length > 0) {
@@ -283,6 +316,7 @@ export function updateAutoMatchmaking(enabled: boolean) {
 export function stopAutoMatchmaking() {
   updateAutoMatchmaking(false)
   resetAutoMatchmakingRuntime()
+  lastObservedQueueId = 0
 }
 
 export function refreshAutoMatchmakingConfig() {
