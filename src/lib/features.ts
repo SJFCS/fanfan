@@ -26,6 +26,7 @@ import { updateAutoHonor } from '@/lib/features/auto-honor'
 import { updateAutoLockChampion } from '@/lib/features/auto-lock-champion'
 import { updateHextechAramAutoLock } from '@/lib/features/hextech-aram-auto-lock'
 import { updateAutoBanChampion } from '@/lib/features/auto-ban-champion'
+import { initNativeAutomationButtonText } from '@/lib/features/native-automation-button-text'
 import { applyRankDisguise, updateRankDisguise } from '@/lib/features/rank-disguise'
 import { updateCustomProfileBg } from '@/lib/features/profile-background'
 import { updateCustomBanner } from '@/lib/features/custom-banner'
@@ -829,6 +830,7 @@ function pickRandomHomepageBackgroundOnStartup() {
 export function initFeatures() {
   preloadChampSelectTierBadgeData()
   installLobbyTempSettings()
+  initNativeAutomationButtonText()
 
   const syncAutoAccept = () => {
     updateAutoAccept(isAutoAcceptEnabledForCurrentLobby())

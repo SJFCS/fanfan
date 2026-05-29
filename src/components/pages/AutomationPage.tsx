@@ -94,7 +94,7 @@ function ChampionPriorityCards({
 }
 
 const AUTO_ACCEPT_DELAY_MIN_SECONDS = 0
-const AUTO_ACCEPT_DELAY_MAX_SECONDS = 15
+const AUTO_ACCEPT_DELAY_MAX_SECONDS = 10
 const AUTO_ACCEPT_DELAY_MS_PER_SECOND = 1000
 
 const autoAcceptDelayInputProps = {

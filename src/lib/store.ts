@@ -32,7 +32,7 @@ export interface SonaConfig {
   lobbyHeaderAutoAcceptEnabled: boolean
   /** 自动接受对局的随机延迟：最小值（毫秒），0 或非法值视为无延迟 */
   autoAcceptDelayMin: number
-  /** 自动接受对局的随机延迟：最大值（毫秒），上限 15000；非法则秒接 */
+  /** 自动接受对局的随机延迟：最大值（毫秒），上限 10000；非法则秒接 */
   autoAcceptDelayMax: number
   /** 开发者模式 */
   developerMode: boolean

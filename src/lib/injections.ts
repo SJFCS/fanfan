@@ -619,7 +619,7 @@ function tryHideRightNavText(): boolean {
  * 在 index.tsx 的 load() 中调用一次即可
  */
 const LOBBY_AUTOMATION_ID = 'sona-lobby-automation-controls'
-const LOBBY_AUTO_ACCEPT_MAX_DELAY_SECONDS = 15
+const LOBBY_AUTO_ACCEPT_MAX_DELAY_SECONDS = 10
 const LOBBY_MS_PER_SECOND = 1000
 
 let lobbyAutomationController: { root: HTMLElement; destroy: () => void } | null = null

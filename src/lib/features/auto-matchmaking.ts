@@ -5,12 +5,11 @@ import { AUTO_MATCHMAKING_MIN_MEMBERS_MAX, AUTO_MATCHMAKING_MIN_MEMBERS_MIN } fr
 import { store } from '@/lib/store'
 import { onAutoReturnedToLobby } from '@/lib/features/auto-return-to-lobby'
 
-// ==================== 自动匹配 ====================
-
 const START_MATCHMAKING_RETRY_MS = 1500
 
 let autoMatchmakingUnsubs: Array<() => void> = []
 let autoMatchmakingTimer: ReturnType<typeof setTimeout> | null = null
+let autoMatchmakingDueAt = 0
 let autoMatchmakingRunId = 0
 let autoMatchmakingEvaluateId = 0
 let autoMatchmakingInFlight = false
@@ -59,11 +58,28 @@ export function isAutoMatchmakingEnabledForCurrentLobby() {
   return store.get('autoMatchmaking') && store.get('lobbyHeaderAutoMatchmakingEnabled')
 }
 
+export function getAutoMatchmakingConfiguredDelayMs() {
+  return getDelayMs()
+}
+
+export function getAutoMatchmakingCountdownMs() {
+  if (!autoMatchmakingTimer || autoMatchmakingDueAt <= 0) {
+    return null
+  }
+
+  return Math.max(0, autoMatchmakingDueAt - Date.now())
+}
+
+export function isAutoMatchmakingCountdownActive() {
+  return autoMatchmakingTimer !== null && autoMatchmakingDueAt > 0
+}
+
 function clearAutoMatchmakingTimer() {
   if (autoMatchmakingTimer) {
     clearTimeout(autoMatchmakingTimer)
     autoMatchmakingTimer = null
   }
+  autoMatchmakingDueAt = 0
 }
 
 function resetAutoMatchmakingRuntime() {
@@ -151,7 +167,7 @@ function cancelScheduledMatchmaking(reason: MatchmakingBlockedReason, shouldInva
   }
 
   if (lastBlockedReason !== reason) {
-    logger.info('[AutoMatchmaking] 暂不开启匹配: %s', reason)
+    logger.info('[AutoMatchmaking] 暂不开启匹配 %s', reason)
     lastBlockedReason = reason
   }
 }
@@ -176,13 +192,15 @@ async function startMatchmaking(runId: number) {
     await lcu.startMatchmaking()
     logger.info('[AutoMatchmaking] 已开始自动匹配 OK')
   } catch (err) {
-    logger.error('[AutoMatchmaking] 开始匹配失败:', err)
+    logger.error('[AutoMatchmaking] 开始匹配失败', err)
     if (runId === autoMatchmakingRunId && isAutoMatchmakingEnabledForCurrentLobby()) {
       autoMatchmakingRunId++
       autoMatchmakingTimer = setTimeout(() => {
         autoMatchmakingTimer = null
+        autoMatchmakingDueAt = 0
         refreshAutoMatchmaking('开始匹配失败后重试')
       }, START_MATCHMAKING_RETRY_MS)
+      autoMatchmakingDueAt = Date.now() + START_MATCHMAKING_RETRY_MS
     }
   } finally {
     autoMatchmakingInFlight = false
@@ -224,9 +242,11 @@ async function refreshAutoMatchmaking(reason: string, resetExistingTimer = false
 
   lastBlockedReason = null
   const runId = ++autoMatchmakingRunId
+  autoMatchmakingDueAt = delayMs > 0 ? Date.now() + delayMs : 0
 
   autoMatchmakingTimer = setTimeout(() => {
     autoMatchmakingTimer = null
+    autoMatchmakingDueAt = 0
     startMatchmaking(runId)
   }, delayMs)
 }
