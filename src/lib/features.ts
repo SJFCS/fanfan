@@ -35,7 +35,14 @@ import { refreshAutoMatchmakingConfig, updateAutoMatchmaking } from '@/lib/featu
 import { updateOpggBuildRecommendation } from '@/lib/features/opgg-build-recommendation'
 import { updateBeautifyCustomAvatar } from '@/lib/features/beautify-client/custom-avatar'
 import { initSocialSidebarGlass, updateSocialSidebarGlassConfig } from '@/lib/features/beautify-client/social-sidebar-glass'
-import { updateBeautifyHomepageBackground, updateBeautifyHomepageBackgroundAdjustments, updateBeautifyHomepageBackgroundGlassConfig } from '@/lib/features/beautify-client/homepage-background'
+import {
+  updateBeautifyHomepageBackground,
+  updateBeautifyHomepageBackgroundAdjustments,
+  updateBeautifyHomepageBackgroundContextState,
+  updateBeautifyHomepageBackgroundGlassConfig,
+  updateBeautifyProfileBackgroundGlassConfig,
+  updateBeautifyRoomBackgroundGlassConfig,
+} from '@/lib/features/beautify-client/homepage-background'
 import { updateHideProfileOverviewBackdrop } from '@/lib/features/beautify-client/profile-overview-backdrop'
 import { updateHideRoomBackdrop } from '@/lib/features/beautify-client/room-backdrop'
 import { updateBeautifyWallpaperMode, updateBeautifyWallpaperModeGlassConfig } from '@/lib/features/beautify-client/wallpaper-mode'
@@ -787,6 +794,27 @@ function syncHomepageBackgroundGlassConfig() {
   })
 }
 
+function syncProfileBackgroundGlassConfig() {
+  updateBeautifyProfileBackgroundGlassConfig({
+    blur: store.get('beautifyProfileBackgroundBlur'),
+    opacity: store.get('beautifyProfileBackgroundOpacity'),
+  })
+}
+
+function syncRoomBackgroundGlassConfig() {
+  updateBeautifyRoomBackgroundGlassConfig({
+    blur: store.get('beautifyRoomBackgroundBlur'),
+    opacity: store.get('beautifyRoomBackgroundOpacity'),
+  })
+}
+
+function syncHomepageBackgroundContextState() {
+  updateBeautifyHomepageBackgroundContextState({
+    profile: store.get('hideProfileOverviewBackdrop'),
+    room: store.get('hideRoomBackdrop'),
+  })
+}
+
 function syncHomepageBackground() {
   updateBeautifyHomepageBackground(
     store.get('beautifyWallpaperMode')
@@ -889,6 +917,12 @@ export function initFeatures() {
   syncHomepageBackgroundGlassConfig()
   store.onChange('beautifyHomepageBackgroundBlur', syncHomepageBackgroundGlassConfig)
   store.onChange('beautifyHomepageBackgroundOpacity', syncHomepageBackgroundGlassConfig)
+  syncProfileBackgroundGlassConfig()
+  store.onChange('beautifyProfileBackgroundBlur', syncProfileBackgroundGlassConfig)
+  store.onChange('beautifyProfileBackgroundOpacity', syncProfileBackgroundGlassConfig)
+  syncRoomBackgroundGlassConfig()
+  store.onChange('beautifyRoomBackgroundBlur', syncRoomBackgroundGlassConfig)
+  store.onChange('beautifyRoomBackgroundOpacity', syncRoomBackgroundGlassConfig)
   updateBeautifyHomepageBackgroundAdjustments(store.get('beautifyHomepageBackgroundAdjustments'))
   store.onChange('beautifyHomepageBackgroundAdjustments', updateBeautifyHomepageBackgroundAdjustments)
   pickRandomHomepageBackgroundOnStartup()
@@ -902,10 +936,16 @@ export function initFeatures() {
   })
 
   updateHideProfileOverviewBackdrop(store.get('hideProfileOverviewBackdrop'))
-  store.onChange('hideProfileOverviewBackdrop', updateHideProfileOverviewBackdrop)
-
   updateHideRoomBackdrop(store.get('hideRoomBackdrop'))
-  store.onChange('hideRoomBackdrop', updateHideRoomBackdrop)
+  syncHomepageBackgroundContextState()
+  store.onChange('hideProfileOverviewBackdrop', (enabled) => {
+    updateHideProfileOverviewBackdrop(enabled)
+    syncHomepageBackgroundContextState()
+  })
+  store.onChange('hideRoomBackdrop', (enabled) => {
+    updateHideRoomBackdrop(enabled)
+    syncHomepageBackgroundContextState()
+  })
 
   const syncAutoReturnToLobby = () => {
     const enabled = store.get('autoHonor') && store.get('autoReturnToLobby')

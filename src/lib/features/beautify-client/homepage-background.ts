@@ -5,6 +5,10 @@ import { resolvePluginAssetUrl } from '@/lib/plugin-resolver'
 const VIEWPORT_ROOT_SELECTOR = 'section#rcp-fe-viewport-root'
 const HOMEPAGE_BACKGROUND_STYLE_ID = 'sona-homepage-background-style'
 const HOMEPAGE_VIDEO_ATTR = 'data-sona-homepage-background-video'
+const HOMEPAGE_CONTEXT_ATTR = 'data-sona-homepage-background-context'
+const PROFILE_SCREEN_SELECTOR = 'div.screen-root[data-screen-name="rcp-fe-lol-profiles-main"]'
+const ROOM_BACKGROUND_IMAGE_SELECTOR =
+  'img.lol-uikit-background-switcher-image[src*="/LeagueClient/GameModeAssets/"][src*="/img/parties-background"]'
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'ogg', 'ogv', 'mov', 'm4v'])
 
 export interface HomepageBackgroundAdjustment {
@@ -29,13 +33,31 @@ function escapeCssUrl(value: string): string {
 let currentAssetPath: string | null = null
 let adjustments: Record<string, HomepageBackgroundAdjustment> = {}
 let isHomepageBackgroundVideoSuspended = false
-let glassConfig: BeautifyGlassConfig = {
+let homepageGlassConfig: BeautifyGlassConfig = {
   blur: 0,
   opacity: 0,
 }
+let profileGlassConfig: BeautifyGlassConfig = {
+  blur: 0,
+  opacity: 0,
+}
+let roomGlassConfig: BeautifyGlassConfig = {
+  blur: 0,
+  opacity: 0,
+}
+let profileContextEnabled = false
+let roomContextEnabled = false
+let lastStyleText = ''
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
+}
+
+function normalizeGlassConfig(config: BeautifyGlassConfig) {
+  return {
+    blur: clamp(config.blur, 0, 40),
+    opacity: clamp(config.opacity, 0, 100) / 100,
+  }
 }
 
 function ensureHomepageBackgroundStyle() {
@@ -43,8 +65,9 @@ function ensureHomepageBackgroundStyle() {
 
   const assetUrl = escapeCssUrl(getAssetUrl(currentAssetPath))
   const isVideo = isVideoAsset(currentAssetPath)
-  const blur = clamp(glassConfig.blur, 0, 40)
-  const opacity = clamp(glassConfig.opacity, 0, 100) / 100
+  const homepageGlass = normalizeGlassConfig(homepageGlassConfig)
+  const profileGlass = normalizeGlassConfig(profileGlassConfig)
+  const roomGlass = normalizeGlassConfig(roomGlassConfig)
   const adjustment = adjustments[currentAssetPath] ?? { scale: 1, offsetX: 0, offsetY: 0 }
   const scale = clamp(adjustment.scale, 1, 3)
   const offsetX = clamp(adjustment.offsetX, -100, 100)
@@ -59,7 +82,7 @@ function ensureHomepageBackgroundStyle() {
     document.head.appendChild(style)
   }
 
-  style.textContent = `
+  const styleText = `
     ${VIEWPORT_ROOT_SELECTOR} {
       position: relative !important;
       ${isVideo ? 'z-index: 0 !important;' : ''}
@@ -67,6 +90,18 @@ function ensureHomepageBackgroundStyle() {
       ${isVideo ? '' : `background-size: ${backgroundSize} !important;`}
       ${isVideo ? '' : `background-position: ${backgroundPositionX} ${backgroundPositionY} !important;`}
       background-repeat: no-repeat !important;
+      --sona-homepage-background-blur: ${homepageGlass.blur}px;
+      --sona-homepage-background-opacity: ${homepageGlass.opacity};
+    }
+
+    ${VIEWPORT_ROOT_SELECTOR}[${HOMEPAGE_CONTEXT_ATTR}="profile"] {
+      --sona-homepage-background-blur: ${profileGlass.blur}px;
+      --sona-homepage-background-opacity: ${profileGlass.opacity};
+    }
+
+    ${VIEWPORT_ROOT_SELECTOR}[${HOMEPAGE_CONTEXT_ATTR}="room"] {
+      --sona-homepage-background-blur: ${roomGlass.blur}px;
+      --sona-homepage-background-opacity: ${roomGlass.opacity};
     }
 
     ${VIEWPORT_ROOT_SELECTOR} > video[${HOMEPAGE_VIDEO_ATTR}] {
@@ -87,11 +122,47 @@ function ensureHomepageBackgroundStyle() {
       inset: 0;
       z-index: 0;
       pointer-events: none;
-      background: rgba(1, 10, 19, ${opacity});
-      backdrop-filter: blur(${blur}px);
-      -webkit-backdrop-filter: blur(${blur}px);
+      background: rgba(1, 10, 19, var(--sona-homepage-background-opacity));
+      backdrop-filter: blur(var(--sona-homepage-background-blur));
+      -webkit-backdrop-filter: blur(var(--sona-homepage-background-blur));
     }
   `
+  if (lastStyleText !== styleText || style.textContent !== styleText) {
+    style.textContent = styleText
+    lastStyleText = styleText
+  }
+}
+
+function setHomepageBackgroundContext(viewportRoot: HTMLElement, context: 'profile' | 'room' | null) {
+  const currentContext = viewportRoot.getAttribute(HOMEPAGE_CONTEXT_ATTR)
+  if (context && currentContext !== context) {
+    viewportRoot.setAttribute(HOMEPAGE_CONTEXT_ATTR, context)
+  } else if (!context && currentContext !== null) {
+    viewportRoot.removeAttribute(HOMEPAGE_CONTEXT_ATTR)
+  }
+}
+
+function syncHomepageBackgroundContext() {
+  const viewportRoot = document.querySelector<HTMLElement>(VIEWPORT_ROOT_SELECTOR)
+  if (!viewportRoot) return
+
+  if (profileContextEnabled && document.querySelector(PROFILE_SCREEN_SELECTOR)) {
+    setHomepageBackgroundContext(viewportRoot, 'profile')
+    return
+  }
+
+  if (roomContextEnabled && document.querySelector(ROOM_BACKGROUND_IMAGE_SELECTOR)) {
+    setHomepageBackgroundContext(viewportRoot, 'room')
+    return
+  }
+
+  setHomepageBackgroundContext(viewportRoot, null)
+}
+
+function clearHomepageBackgroundContext() {
+  document
+    .querySelector<HTMLElement>(VIEWPORT_ROOT_SELECTOR)
+    ?.removeAttribute(HOMEPAGE_CONTEXT_ATTR)
 }
 
 function ensureHomepageBackgroundVideo() {
@@ -133,6 +204,7 @@ function removeHomepageBackgroundVideo() {
 function tryApplyHomepageBackground(): boolean {
   ensureHomepageBackgroundStyle()
   ensureHomepageBackgroundVideo()
+  syncHomepageBackgroundContext()
 
   return true
 }
@@ -152,17 +224,45 @@ export function updateBeautifyHomepageBackground(assetPath: string | null) {
     registered = false
     injector.unregister(tryApplyHomepageBackground)
     document.getElementById(HOMEPAGE_BACKGROUND_STYLE_ID)?.remove()
+    lastStyleText = ''
     removeHomepageBackgroundVideo()
+    clearHomepageBackgroundContext()
   } else if (!assetPath) {
     document.getElementById(HOMEPAGE_BACKGROUND_STYLE_ID)?.remove()
+    lastStyleText = ''
     removeHomepageBackgroundVideo()
+    clearHomepageBackgroundContext()
   }
 }
 
 export function updateBeautifyHomepageBackgroundGlassConfig(config: BeautifyGlassConfig) {
-  glassConfig = config
+  homepageGlassConfig = config
   if (registered) {
     ensureHomepageBackgroundStyle()
+  }
+}
+
+export function updateBeautifyProfileBackgroundGlassConfig(config: BeautifyGlassConfig) {
+  profileGlassConfig = config
+  if (registered) {
+    ensureHomepageBackgroundStyle()
+  }
+}
+
+export function updateBeautifyRoomBackgroundGlassConfig(config: BeautifyGlassConfig) {
+  roomGlassConfig = config
+  if (registered) {
+    ensureHomepageBackgroundStyle()
+  }
+}
+
+export function updateBeautifyHomepageBackgroundContextState(nextState: { profile: boolean; room: boolean }) {
+  profileContextEnabled = nextState.profile
+  roomContextEnabled = nextState.room
+  if (registered) {
+    syncHomepageBackgroundContext()
+  } else {
+    clearHomepageBackgroundContext()
   }
 }
 

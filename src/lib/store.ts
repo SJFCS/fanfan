@@ -127,6 +127,14 @@ export interface SonaConfig {
   beautifyHomepageBackgroundBlur: number
   /** 主页壁纸底色不透明度（0-100） */
   beautifyHomepageBackgroundOpacity: number
+  /** 生涯壁纸模糊强度（px） */
+  beautifyProfileBackgroundBlur: number
+  /** 生涯壁纸底色不透明度（0-100） */
+  beautifyProfileBackgroundOpacity: number
+  /** 房间壁纸模糊强度（px） */
+  beautifyRoomBackgroundBlur: number
+  /** 房间壁纸底色不透明度（0-100） */
+  beautifyRoomBackgroundOpacity: number
   /** 美化毛玻璃模糊强度（px） */
   beautifyGlassBlur: number
   /** 美化毛玻璃背景不透明度（0-100） */
@@ -274,6 +282,10 @@ const DEFAULT_CONFIG: SonaConfig = {
   beautifyHomepageBackgroundAdjustments: {},
   beautifyHomepageBackgroundBlur: 0,
   beautifyHomepageBackgroundOpacity: 0,
+  beautifyProfileBackgroundBlur: 0,
+  beautifyProfileBackgroundOpacity: 0,
+  beautifyRoomBackgroundBlur: 0,
+  beautifyRoomBackgroundOpacity: 0,
   beautifyGlassBlur: 14,
   beautifyGlassOpacity: 28,
   beautifyAssetPaths: [],
@@ -344,6 +356,7 @@ class SonaStore {
     this.migrateLegacyAutoReturnMode(loaded)
     this.migrateLegacyInGameAutoPopupMode(loaded)
     this.migrateLegacyAutoReturnMode(loaded)
+    this.migrateBackgroundEffectSettings(loaded)
     this.cache = loaded
   }
 
@@ -457,6 +470,27 @@ class SonaStore {
     if (legacyGameAnalysisPopup) {
       loaded.inGameAutoPopupMode = 'gameAnalysis'
       DataStore.set(`${KEY_PREFIX}inGameAutoPopupMode`, loaded.inGameAutoPopupMode)
+    }
+  }
+
+  private migrateBackgroundEffectSettings(loaded: SonaConfig) {
+    const migrations: Array<[keyof Pick<
+      SonaConfig,
+      | 'beautifyProfileBackgroundBlur'
+      | 'beautifyProfileBackgroundOpacity'
+      | 'beautifyRoomBackgroundBlur'
+      | 'beautifyRoomBackgroundOpacity'
+    >, number]> = [
+      ['beautifyProfileBackgroundBlur', loaded.beautifyHomepageBackgroundBlur],
+      ['beautifyProfileBackgroundOpacity', loaded.beautifyHomepageBackgroundOpacity],
+      ['beautifyRoomBackgroundBlur', loaded.beautifyHomepageBackgroundBlur],
+      ['beautifyRoomBackgroundOpacity', loaded.beautifyHomepageBackgroundOpacity],
+    ]
+
+    for (const [key, value] of migrations) {
+      if (DataStore.get(`${KEY_PREFIX}${key}`) !== undefined) continue
+      loaded[key] = value
+      DataStore.set(`${KEY_PREFIX}${key}`, value)
     }
   }
 }

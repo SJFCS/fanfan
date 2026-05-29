@@ -242,6 +242,10 @@ export function CustomPage() {
   const [homepageBackgroundAdjustments, setHomepageBackgroundAdjustments] = useState(() => store.get('beautifyHomepageBackgroundAdjustments'))
   const [homepageBackgroundBlur, setHomepageBackgroundBlur] = useState(() => store.get('beautifyHomepageBackgroundBlur'))
   const [homepageBackgroundOpacity, setHomepageBackgroundOpacity] = useState(() => store.get('beautifyHomepageBackgroundOpacity'))
+  const [profileBackgroundBlur, setProfileBackgroundBlur] = useState(() => store.get('beautifyProfileBackgroundBlur'))
+  const [profileBackgroundOpacity, setProfileBackgroundOpacity] = useState(() => store.get('beautifyProfileBackgroundOpacity'))
+  const [roomBackgroundBlur, setRoomBackgroundBlur] = useState(() => store.get('beautifyRoomBackgroundBlur'))
+  const [roomBackgroundOpacity, setRoomBackgroundOpacity] = useState(() => store.get('beautifyRoomBackgroundOpacity'))
   const [glassBlur, setGlassBlur] = useState(() => store.get('beautifyGlassBlur'))
   const [glassOpacity, setGlassOpacity] = useState(() => store.get('beautifyGlassOpacity'))
   const [assetPaths, setAssetPaths] = useState(() => store.get('beautifyAssetPaths'))
@@ -366,6 +370,26 @@ export function CustomPage() {
   const updateHomepageBackgroundOpacity = (value: number) => {
     setHomepageBackgroundOpacity(value)
     store.set('beautifyHomepageBackgroundOpacity', value)
+  }
+
+  const updateProfileBackgroundBlur = (value: number) => {
+    setProfileBackgroundBlur(value)
+    store.set('beautifyProfileBackgroundBlur', value)
+  }
+
+  const updateProfileBackgroundOpacity = (value: number) => {
+    setProfileBackgroundOpacity(value)
+    store.set('beautifyProfileBackgroundOpacity', value)
+  }
+
+  const updateRoomBackgroundBlur = (value: number) => {
+    setRoomBackgroundBlur(value)
+    store.set('beautifyRoomBackgroundBlur', value)
+  }
+
+  const updateRoomBackgroundOpacity = (value: number) => {
+    setRoomBackgroundOpacity(value)
+    store.set('beautifyRoomBackgroundOpacity', value)
   }
 
   const addHomepageBackgroundInputPath = () => {
@@ -1453,6 +1477,28 @@ export function CustomPage() {
                   onChange={(v) => { setHideProfileOverviewBackdrop(v); store.set('hideProfileOverviewBackdrop', v) }}
                 />
               </SettingCard>
+              {hideProfileOverviewBackdrop && (
+                <SettingCard title={t('beautify.profileWallpaper.effect')}>
+                  <div className="sona-glass-settings">
+                    <SonaSlider
+                      label={t('beautify.slider.blur')}
+                      value={profileBackgroundBlur}
+                      min={0}
+                      max={30}
+                      unit="px"
+                      onChange={updateProfileBackgroundBlur}
+                    />
+                    <SonaSlider
+                      label={t('beautify.slider.opacity')}
+                      value={profileBackgroundOpacity}
+                      min={0}
+                      max={80}
+                      unit="%"
+                      onChange={updateProfileBackgroundOpacity}
+                    />
+                  </div>
+                </SettingCard>
+              )}
               <SettingCard
                 title={t('beautify.roomBackdrop.title')}
                 description={t('beautify.roomBackdrop.description')}
@@ -1462,6 +1508,28 @@ export function CustomPage() {
                   onChange={(v) => { setHideRoomBackdrop(v); store.set('hideRoomBackdrop', v) }}
                 />
               </SettingCard>
+              {hideRoomBackdrop && (
+                <SettingCard title={t('beautify.roomWallpaper.effect')}>
+                  <div className="sona-glass-settings">
+                    <SonaSlider
+                      label={t('beautify.slider.blur')}
+                      value={roomBackgroundBlur}
+                      min={0}
+                      max={30}
+                      unit="px"
+                      onChange={updateRoomBackgroundBlur}
+                    />
+                    <SonaSlider
+                      label={t('beautify.slider.opacity')}
+                      value={roomBackgroundOpacity}
+                      min={0}
+                      max={80}
+                      unit="%"
+                      onChange={updateRoomBackgroundOpacity}
+                    />
+                  </div>
+                </SettingCard>
+              )}
             </div>
           </div>
         )}
