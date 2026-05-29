@@ -12,6 +12,15 @@ export interface SidebarItem {
   label: string
 }
 
+export interface SidebarQuickAction {
+  id: string
+  icon: ReactNode
+  label: string
+  onClick: () => void
+  active?: boolean
+  busy?: boolean
+}
+
 export interface SidebarProps {
   items: SidebarItem[]
   activeId: string
@@ -19,9 +28,18 @@ export interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
   onHomeClick?: () => void
+  quickActions?: SidebarQuickAction[]
 }
 
-export function Sidebar({ items, activeId, onSelect, collapsed, onToggle, onHomeClick }: SidebarProps) {
+export function Sidebar({
+  items,
+  activeId,
+  onSelect,
+  collapsed,
+  onToggle,
+  onHomeClick,
+  quickActions = [],
+}: SidebarProps) {
   const { localeSetting, setLocaleSetting, t } = useI18n()
   const languageOptions = [
     { value: 'auto', label: t('settings.language.auto') },
@@ -73,6 +91,23 @@ export function Sidebar({ items, activeId, onSelect, collapsed, onToggle, onHome
       </nav>
 
       <div className="sona-sidebar-footer">
+        {!collapsed && quickActions.length > 0 && (
+          <div className="sona-sidebar-quick-actions">
+            {quickActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className={`sona-sidebar-quick-action${action.active ? ' sona-sidebar-quick-action--active' : ''}${action.busy ? ' sona-sidebar-quick-action--busy' : ''}`}
+                onClick={action.onClick}
+                title={action.label}
+                aria-label={action.label}
+                disabled={action.busy}
+              >
+                <span className="sona-sidebar-quick-action-icon">{action.icon}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <button className="sona-sidebar-toggle" onClick={onToggle} title={collapsed ? t('sidebar.expand') : t('sidebar.collapse')}>
           {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </button>

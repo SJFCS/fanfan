@@ -215,17 +215,75 @@
 
 .sona-sidebar-footer {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
   justify-content: center;
   padding: 8px 6px;
   border-top: 1px solid rgba(200, 170, 110, 0.1);
   flex-shrink: 0;
 }
 
+.sona-sidebar-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+}
+
+.sona-sidebar-quick-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 32px;
+  padding: 0;
+  background: rgba(1, 10, 19, 0.32);
+  border: 1px solid rgba(120, 90, 40, 0.4);
+  border-radius: 4px;
+  color: rgba(200, 170, 110, 0.72);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sona-sidebar-quick-action:hover {
+  color: #f0e6d2;
+  background: rgba(200, 170, 110, 0.1);
+  border-color: rgba(200, 170, 110, 0.28);
+}
+
+.sona-sidebar-quick-action--active {
+  color: #c8aa6e;
+  background: rgba(200, 170, 110, 0.15);
+  border-color: rgba(200, 170, 110, 0.46);
+}
+
+.sona-sidebar-quick-action--busy {
+  opacity: 0.72;
+  cursor: progress;
+}
+
+.sona-sidebar-quick-action:disabled {
+  pointer-events: none;
+}
+
+.sona-sidebar-quick-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.sona-sidebar-quick-action-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .sona-sidebar-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 80%;
+  width: 100%;
   height: 28px;
   background: none;
   border: 1px solid transparent;
@@ -244,4 +302,8 @@
 
 .sona-sidebar-toggle:active {
   transform: scale(0.9);
+}
+
+.sona-sidebar--collapsed .sona-sidebar-quick-actions {
+  display: none;
 }

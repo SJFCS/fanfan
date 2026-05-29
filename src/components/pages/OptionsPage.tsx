@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { SettingCard, SettingGroup } from '@/components/ui/SettingCard'
 import { SonaSwitch } from '@/components/ui/SonaSwitch'
 import { SonaSelect } from '@/components/ui/SonaSelect'
+import { SidebarPinButton } from '@/components/ui/SidebarPinButton'
 import { store } from '@/lib/store'
 import { useI18n } from '@/i18n'
 import '@/styles/SettingsPage.css'
@@ -9,6 +10,7 @@ import '@/styles/ConfigLockPage.css'
 import { lcu } from '@/lib/lcu'
 import { SonaButton } from '@/components/ui/SonaButton'
 import { SonaInput } from '@/components/ui/SonaInput'
+import { toggleGameConfigLock } from '@/lib/sidebar-quick-actions'
 
 function BackupManager() {
   const { t } = useI18n()
@@ -55,23 +57,12 @@ function BackupManager() {
   }
 
   const toggleConfigLocked = async () => {
-    if (!Pengu.gameConfig) {
-      setConfigActionError(t('tools.configLock.unsupported'))
-      return
-    }
-
-    const next = !locked
     setUpdatingConfigLock(true)
     setConfigActionError('')
 
     try {
-      if (next) {
-        await Pengu.gameConfig.lock()
-      } else {
-        await Pengu.gameConfig.unlock()
-      }
+      const next = await toggleGameConfigLock()
       setLocked(next)
-      store.set('gameConfigLocked', next)
     } catch (err) {
       setConfigActionError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -140,6 +131,7 @@ function BackupManager() {
           title={t('tools.group.configLock')}
           description={t('tools.group.configLock.description')}
         >
+          <SidebarPinButton action="gameConfigLock" label={t('tools.group.configLock')} />
           <SonaButton variant="secondary" onClick={toggleConfigDetails}>
             {configDetailsOpen ? t('tools.configLock.collapse') : t('tools.configLock.details')}
           </SonaButton>

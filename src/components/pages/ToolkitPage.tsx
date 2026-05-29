@@ -3,13 +3,13 @@ import { SettingCard, SettingGroup } from '@/components/ui/SettingCard'
 import { SonaButton } from '@/components/ui/SonaButton'
 import { SonaInput } from '@/components/ui/SonaInput'
 import { MatchHistoryModal } from '@/components/ui/MatchHistoryModal'
+import { SidebarPinButton } from '@/components/ui/SidebarPinButton'
 import { lcu } from '@/lib/lcu'
 import { logger } from '@/index'
 import { useI18n } from '@/i18n'
-import type { ChatFriend, GameflowPhase } from '@/types/lcu'
+import type { ChatFriend } from '@/types/lcu'
+import { leaveCurrentLobby, playAgainFromEndgame, restartClientUx } from '@/lib/sidebar-quick-actions'
 import '@/styles/SettingsPage.css'
-
-const ENDGAME_PHASES: GameflowPhase[] = ['WaitingForStats', 'PreEndOfGame', 'EndOfGame']
 
 export function ToolkitPage() {
   const { t } = useI18n()
@@ -60,7 +60,7 @@ export function ToolkitPage() {
     setRestartUxError('')
 
     try {
-      await lcu.restartUx()
+      await restartClientUx()
       logger.info('[Toolkit] League Client UX restart requested')
     } catch (err) {
       logger.error('[Toolkit] Failed to restart League Client UX:', err)
@@ -77,12 +77,7 @@ export function ToolkitPage() {
     setGameflowStatus('')
 
     try {
-      const phase = await lcu.getGameflowPhase()
-      if (!ENDGAME_PHASES.includes(phase)) {
-        throw new Error(t('tools.gameflow.playAgain.notEndgame', { phase }))
-      }
-
-      await lcu.playAgain()
+      const phase = await playAgainFromEndgame()
       setGameflowStatus(t('tools.gameflow.playAgain.success'))
       logger.info('[Toolkit] Requested play-again from endgame phase: %s', phase)
     } catch (err) {
@@ -100,12 +95,7 @@ export function ToolkitPage() {
     setGameflowStatus('')
 
     try {
-      const phase = await lcu.getGameflowPhase()
-      if (phase !== 'Lobby') {
-        throw new Error(t('tools.gameflow.leaveLobby.notLobby', { phase }))
-      }
-
-      await lcu.leaveLobby()
+      await leaveCurrentLobby()
       setGameflowStatus(t('tools.gameflow.leaveLobby.success'))
       logger.info('[Toolkit] Left current lobby')
     } catch (err) {
@@ -457,6 +447,7 @@ export function ToolkitPage() {
             <SonaButton variant="primary" onClick={handlePlayAgain} disabled={gameflowAction !== null}>
               {gameflowAction === 'playAgain' ? t('tools.gameflow.processing') : t('tools.gameflow.playAgain.button')}
             </SonaButton>
+            <SidebarPinButton action="playAgain" label={t('tools.gameflow.playAgain.title')} />
           </SettingCard>
 
           <SettingCard
@@ -466,6 +457,7 @@ export function ToolkitPage() {
             <SonaButton variant="secondary" onClick={handleLeaveLobby} disabled={gameflowAction !== null}>
               {gameflowAction === 'leaveLobby' ? t('tools.gameflow.processing') : t('tools.gameflow.leaveLobby.button')}
             </SonaButton>
+            <SidebarPinButton action="leaveLobby" label={t('tools.gameflow.leaveLobby.title')} />
           </SettingCard>
 
           {gameflowStatus && (
@@ -481,6 +473,7 @@ export function ToolkitPage() {
             <SonaButton variant="secondary" onClick={handleRestartUx} disabled={restartingUx}>
               {restartingUx ? t('tools.restartUx.restarting') : t('tools.restartUx.button')}
             </SonaButton>
+            <SidebarPinButton action="restartUx" label={t('tools.restartUx.title')} />
           </SettingCard>
 
           {restartUxError && (

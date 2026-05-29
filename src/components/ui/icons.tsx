@@ -88,6 +88,46 @@ export function LockIcon() {
   )
 }
 
+export function PinIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 17v5" />
+      <path d="M5 17h14" />
+      <path d="M7 3h10l-2 7 3 7H6l3-7-2-7Z" />
+    </svg>
+  )
+}
+
+export function ReturnIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h11a5 5 0 0 1 0 10H8" />
+    </svg>
+  )
+}
+
+export function LogOutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  )
+}
+
+export function RefreshIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a9 9 0 0 1-15.4 6.36L3 16" />
+      <path d="M3 21v-5h5" />
+      <path d="M3 12A9 9 0 0 1 18.4 5.64L21 8" />
+      <path d="M21 3v5h-5" />
+    </svg>
+  )
+}
+
 export function EnhanceIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

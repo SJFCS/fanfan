@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import '@/styles/App.css'
 import { logger } from '.'
 import { Modal } from '@/components/ui/Modal'
-import { Sidebar, type SidebarItem } from '@/components/ui/Sidebar'
+import { Sidebar, type SidebarItem, type SidebarQuickAction } from '@/components/ui/Sidebar'
 import { HomePage } from '@/components/pages/HomePage'
 // import { ToolsPage } from '@/components/pages/ToolsPage'
 // import { BeautifyPage } from '@/components/pages/BeautifyPage'
@@ -18,10 +18,17 @@ import { AboutPage } from '@/components/pages/AboutPage'
 import { DebugPage } from '@/components/pages/DebugPage'
 import { UpdatePage } from '@/components/pages/UpdatePage'
 import { AutoClaimPage } from '@/components/pages/AutoClaimPage'
-import { GamepadIcon, PaletteIcon, SettingsIcon, InfoIcon, BugIcon, ZapIcon, EnhanceIcon, AutomationIcon, NexusIcon, UpdateIcon, RewardIcon, FriendManagerIcon } from '@/components/ui/icons'
+import { GamepadIcon, PaletteIcon, SettingsIcon, InfoIcon, BugIcon, ZapIcon, EnhanceIcon, AutomationIcon, NexusIcon, UpdateIcon, RewardIcon, FriendManagerIcon, LockIcon, ReturnIcon, LogOutIcon, RefreshIcon } from '@/components/ui/icons'
 import { onModalVisibilityChange, isModalVisible, closeModal } from '@/lib/modal'
 import { store } from '@/lib/store'
 import { getUpdateState, onUpdateStateChange, type UpdateState } from '@/lib/update-checker'
+import {
+  getSidebarQuickActionBusySnapshot,
+  getSidebarQuickActionPins,
+  onSidebarQuickActionPinsChange,
+  onSidebarQuickActionStateChange,
+  runSidebarQuickAction,
+} from '@/lib/sidebar-quick-actions'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 
@@ -90,6 +97,9 @@ export function App() {
   const [visible, setVisible] = useState(isModalVisible())
   const [activePageId, setActivePageId] = useState(() => (getUpdateState().status === 'available' ? 'update' : 'home'))
   const [sidebarCollapsed, setSidebarCollapsed] = useState(store.get('sidebarCollapsed'))
+  const [gameConfigLocked, setGameConfigLocked] = useState(store.get('gameConfigLocked'))
+  const [sidebarQuickActionPins, setSidebarQuickActionPins] = useState(getSidebarQuickActionPins())
+  const [sidebarQuickActionBusy, setSidebarQuickActionBusy] = useState(getSidebarQuickActionBusySnapshot())
   const [devMode, setDevMode] = useState(store.get('developerMode'))
   const [updateState, setUpdateState] = useState<UpdateState>(() => getUpdateState())
 
@@ -124,6 +134,20 @@ export function App() {
     })
   }, [activePageId])
 
+  useEffect(() => {
+    return store.onChange('gameConfigLocked', setGameConfigLocked)
+  }, [])
+
+  useEffect(() => {
+    return onSidebarQuickActionPinsChange(setSidebarQuickActionPins)
+  }, [])
+
+  useEffect(() => {
+    return onSidebarQuickActionStateChange(() => {
+      setSidebarQuickActionBusy(getSidebarQuickActionBusySnapshot())
+    })
+  }, [])
+
   // 动态构建侧边栏项目
   const sidebarItems = useMemo(() => {
     const makeItem = (item: Omit<SidebarItem, 'label'> & { labelKey: TranslationKey }): SidebarItem => ({
@@ -137,6 +161,50 @@ export function App() {
       : baseItems
     return devMode ? [...items, makeItem(debugSidebarItemConfig)] : items
   }, [devMode, t, updateState.status])
+
+  const sidebarQuickActions = useMemo<SidebarQuickAction[]>(() => {
+    const actions: Array<SidebarQuickAction | null> = [
+      sidebarQuickActionPins.gameConfigLock
+        ? {
+          id: 'gameConfigLock',
+          icon: <LockIcon />,
+          label: gameConfigLocked ? t('tools.configLock.unlock') : t('tools.configLock.lock'),
+          onClick: () => { void runSidebarQuickAction('gameConfigLock') },
+          active: gameConfigLocked,
+          busy: sidebarQuickActionBusy.gameConfigLock,
+        }
+        : null,
+      sidebarQuickActionPins.playAgain
+        ? {
+          id: 'playAgain',
+          icon: <ReturnIcon />,
+          label: t('tools.gameflow.playAgain.button'),
+          onClick: () => { void runSidebarQuickAction('playAgain') },
+          busy: sidebarQuickActionBusy.playAgain,
+        }
+        : null,
+      sidebarQuickActionPins.leaveLobby
+        ? {
+          id: 'leaveLobby',
+          icon: <LogOutIcon />,
+          label: t('tools.gameflow.leaveLobby.button'),
+          onClick: () => { void runSidebarQuickAction('leaveLobby') },
+          busy: sidebarQuickActionBusy.leaveLobby,
+        }
+        : null,
+      sidebarQuickActionPins.restartUx
+        ? {
+          id: 'restartUx',
+          icon: <RefreshIcon />,
+          label: t('tools.restartUx.button'),
+          onClick: () => { void runSidebarQuickAction('restartUx') },
+          busy: sidebarQuickActionBusy.restartUx,
+        }
+        : null,
+    ]
+
+    return actions.filter((action): action is SidebarQuickAction => Boolean(action))
+  }, [gameConfigLocked, sidebarQuickActionBusy, sidebarQuickActionPins, t])
 
   const handleClose = () => {
     closeModal()
@@ -166,6 +234,7 @@ export function App() {
           collapsed={sidebarCollapsed}
           onToggle={handleToggleSidebar}
           onHomeClick={() => setActivePageId('home')}
+          quickActions={sidebarQuickActions}
         />
         <div className="sona-content">
           <PageContent pageId={activePageId} />

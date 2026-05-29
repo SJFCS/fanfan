@@ -45,6 +45,14 @@ export interface SonaConfig {
   benchNoCooldown: boolean
   /** 侧边栏收缩状态 */
   sidebarCollapsed: boolean
+  /** 侧边栏固定快捷按钮：游戏配置锁定 */
+  sidebarPinnedGameConfigLock: boolean
+  /** 侧边栏固定快捷按钮：退出结算返回房间 */
+  sidebarPinnedPlayAgain: boolean
+  /** 侧边栏固定快捷按钮：退出当前房间 */
+  sidebarPinnedLeaveLobby: boolean
+  /** 侧边栏固定快捷按钮：重启客户端界面 */
+  sidebarPinnedRestartUx: boolean
   /** 在线状态 */
   availability: string
   /** 自定义签名（按 puuid 独立存储，切换账号互不影响） */
@@ -252,6 +260,10 @@ const DEFAULT_CONFIG: SonaConfig = {
   gameConfigLocked: false,
   benchNoCooldown: false,
   sidebarCollapsed: false,
+  sidebarPinnedGameConfigLock: true,
+  sidebarPinnedPlayAgain: true,
+  sidebarPinnedLeaveLobby: true,
+  sidebarPinnedRestartUx: true,
   availability: 'chat',
   statusMessage: {},
   hotkey: 'F1',
