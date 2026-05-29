@@ -6,6 +6,7 @@ import { injector } from '@/lib/InjectorManager'
 import { lcu, LcuEventUri, queueIdToTag } from '@/lib/lcu'
 import type { LCUEventMessage, Lobby } from '@/lib/lcu'
 import { calculateSonaPlayerStrengthScore, shouldSkipSonaStrengthGame } from '@/lib/player-strength-score'
+import { getRating } from '@/lib/rating'
 import { store } from '@/lib/store'
 
 const SONA_LOBBY_HISTORY_ATTR = 'data-sona-lobby-history'
@@ -34,6 +35,11 @@ interface LobbyMemberStats {
   kda: number
   score: number | null
   total: number
+}
+
+interface StatsOverlaySegment {
+  text: string
+  color: string
 }
 
 function createEmptyLobbyMemberStats(): LobbyMemberStats {
@@ -248,6 +254,56 @@ function getScoreColor(score: number): string {
   return '#e74c3c'
 }
 
+function formatWinRate(rate: number): string {
+  return `${Math.round(rate * 100)}%`
+}
+
+function formatKda(kda: number): string {
+  return kda >= 99 ? 'Perfect' : kda.toFixed(2)
+}
+
+function formatScore(score: number | null): string {
+  return score != null ? score.toFixed(1) : '--'
+}
+
+function getStatsOverlaySegments(stats: LobbyMemberStats): StatsOverlaySegment[] {
+  const winRateText = formatWinRate(stats.winRate)
+  const kdaText = formatKda(stats.kda)
+  const scoreText = formatScore(stats.score)
+  const ratingText = getRating(stats.winRate * 100, stats.kda)
+  const displayMode = store.get('lobbyEnhancementDisplayMode')
+
+  if (displayMode === 'humor') {
+    return [
+      { text: ratingText, color: '#c8aa6e' },
+      { text: `胜率 ${winRateText}`, color: getRateColor(stats.winRate) },
+    ]
+  }
+
+  return [
+    { text: ratingText, color: '#c8aa6e' },
+    { text: `胜率 ${winRateText}`, color: getRateColor(stats.winRate) },
+    { text: `评分 ${scoreText}`, color: stats.score != null ? getScoreColor(stats.score) : '#a09b8c' },
+  ]
+}
+
+function setStatsOverlaySegments(overlay: HTMLElement, segments: StatsOverlaySegment[]) {
+  overlay.textContent = ''
+  segments.forEach((segment, index) => {
+    if (index > 0) {
+      const separator = document.createElement('span')
+      separator.style.color = '#5c5b57'
+      separator.textContent = '|'
+      overlay.appendChild(separator)
+    }
+
+    const span = document.createElement('span')
+    span.style.color = segment.color
+    span.textContent = segment.text
+    overlay.appendChild(span)
+  })
+}
+
 function ensureStatsOverlay(identity: HTMLElement): HTMLDivElement {
   let overlay = identity.querySelector(`[${SONA_LOBBY_STATS_ATTR}]`) as HTMLDivElement | null
   if (overlay) return overlay
@@ -280,13 +336,10 @@ function ensureStatsOverlay(identity: HTMLElement): HTMLDivElement {
 
 function renderStatsOverlay(identity: HTMLElement, stats: LobbyMemberStats | undefined) {
   const overlay = ensureStatsOverlay(identity)
+  const segments = stats?.total ? getStatsOverlaySegments(stats) : null
   const nextText = stats
     ? stats.total > 0
-      ? [
-        `胜率 ${Math.round(stats.winRate * 100)}%`,
-        `KDA ${stats.kda >= 99 ? 'Perfect' : stats.kda.toFixed(2)}`,
-        `评分 ${stats.score != null ? stats.score.toFixed(1) : '--'}`,
-      ].join('|')
+      ? `${store.get('lobbyEnhancementDisplayMode')}:${segments?.map((segment) => segment.text).join('|')}`
       : '萌新上线|暂无数据'
     : '战绩加载中...'
 
@@ -309,13 +362,9 @@ function renderStatsOverlay(identity: HTMLElement, stats: LobbyMemberStats | und
     return
   }
 
-  overlay.innerHTML = [
-    `<span style="color:${getRateColor(stats.winRate)}">胜率 ${Math.round(stats.winRate * 100)}%</span>`,
-    `<span style="color:#5c5b57">|</span>`,
-    `<span style="color:${getKdaColor(stats.kda)}">KDA ${stats.kda >= 99 ? 'Perfect' : stats.kda.toFixed(2)}</span>`,
-    `<span style="color:#5c5b57">|</span>`,
-    `<span style="color:${stats.score != null ? getScoreColor(stats.score) : '#a09b8c'}">评分 ${stats.score != null ? stats.score.toFixed(1) : '--'}</span>`,
-  ].join('')
+  if (segments) {
+    setStatsOverlaySegments(overlay, segments)
+  }
 }
 
 function bindIdentityClick(identity: HTMLElement, info: LobbyMemberInfo) {
@@ -391,6 +440,11 @@ function cleanupBoundIdentities() {
 }
 
 export function updateLobbyMemberMatchHistory(enabled: boolean) {
+  if (enabled && lobbyMemberHistoryRegistered) {
+    tryInjectLobbyMemberHistory()
+    return
+  }
+
   if (enabled && !lobbyMemberHistoryRegistered) {
     lobbyMemberHistoryRegistered = true
 

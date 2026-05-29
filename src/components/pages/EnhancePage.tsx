@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { SettingCard, SettingGroup } from '@/components/ui/SettingCard'
 import { SonaSwitch } from '@/components/ui/SonaSwitch'
 import { SonaSelect } from '@/components/ui/SonaSelect'
-import { store, type InGameAutoPopupMode } from '@/lib/store'
+import { store, type InGameAutoPopupMode, type LobbyEnhancementDisplayMode } from '@/lib/store'
 import { useI18n } from '@/i18n'
 import '@/styles/SettingsPage.css'
 
@@ -32,6 +32,7 @@ export function EnhancePage() {
   const [sideIndicatorMsgType, setSideIndicatorMsgType] = useState(store.get('sideIndicatorMsgType'))
   const [benchNoCooldown, setBenchNoCooldown] = useState(store.get('benchNoCooldown'))
   const [lobbyEnhancementFetchCount, setLobbyEnhancementFetchCount] = useState(store.get('lobbyEnhancementFetchCount'))
+  const [lobbyEnhancementDisplayMode, setLobbyEnhancementDisplayMode] = useState(store.get('lobbyEnhancementDisplayMode'))
   const [lobbyEnhancement, setLobbyEnhancement] = useState(store.get('lobbyEnhancement'))
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export function EnhancePage() {
       store.onChange('sideIndicatorMsgType', setSideIndicatorMsgType),
       store.onChange('benchNoCooldown', setBenchNoCooldown),
       store.onChange('lobbyEnhancementFetchCount', setLobbyEnhancementFetchCount),
+      store.onChange('lobbyEnhancementDisplayMode', setLobbyEnhancementDisplayMode),
       store.onChange('lobbyEnhancement', setLobbyEnhancement),
     ]
     return () => unsubs.forEach((fn) => fn())
@@ -126,6 +128,18 @@ export function EnhancePage() {
             value={String(lobbyEnhancementFetchCount)}
             onChange={(v) => { setLobbyEnhancementFetchCount(Number(v)); store.set('lobbyEnhancementFetchCount', Number(v)) }}
             options={recentOptions}
+          />
+          <SonaSelect
+            value={lobbyEnhancementDisplayMode}
+            onChange={(v) => {
+              const mode = v as LobbyEnhancementDisplayMode
+              setLobbyEnhancementDisplayMode(mode)
+              store.set('lobbyEnhancementDisplayMode', mode)
+            }}
+            options={[
+              { value: 'humor', label: t('option.lobbyEnhancementDisplay.humor') },
+              { value: 'score', label: t('option.lobbyEnhancementDisplay.score') },
+            ]}
           />
           <SonaSwitch
             checked={lobbyEnhancement}

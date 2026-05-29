@@ -22,6 +22,7 @@
 // ==================== 配置项定义 ====================
 
 export type InGameAutoPopupMode = 'none' | 'gameAnalysis' | 'buildRecommendation'
+export type LobbyEnhancementDisplayMode = 'humor' | 'score'
 
 /** 所有配置项及其类型 */
 export interface SonaConfig {
@@ -167,6 +168,8 @@ export interface SonaConfig {
   lobbyEnhancement: boolean
   /** 组队界面增强查询局数（20/50/100），默认50 */
   lobbyEnhancementFetchCount: number
+  /** 组队界面增强旗帜战绩展示模式：humor=幽默评价，score=综合评分 */
+  lobbyEnhancementDisplayMode: LobbyEnhancementDisplayMode
   /** 自定义生涯背景 */
   customProfileBg: boolean
   /** 无视他人生涯隐私（XHR 响应改写，需重启生效） */
@@ -300,6 +303,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   friendMatchHistory: true,
   lobbyEnhancement: true,
   lobbyEnhancementFetchCount: 50,
+  lobbyEnhancementDisplayMode: 'score',
   hideTFT: false,
   gameModeFilter: true,
   hiddenGameModes: {},
