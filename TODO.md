@@ -4,7 +4,6 @@ git子项目
 
 ```bash
 git remote add enhance https://github.com/1123123w/sona_enhance.git
-
 git rebase enhance/main
 git merge enhance/main
 git fetch enhance
@@ -34,9 +33,13 @@ git fetch enhance
 
 ## 待验证
 
+点击匹配后客户端经常卡死
+
+--测试返回房间日志 commit
+
 
 - 自动接受对局，从秒改成毫秒，且将延迟  放在一行内，设置好输入框的最大最小值
-
+- feat: 切换模式重置自动匹配计时器
 - 自动回房间❗自动点赞❗ 验证是否有bug ！回房间可以不用点赞（可以跳过的秒回）只允许 WaitingForStats、PreEndOfGame、EndOfGame 这三个阶段。只有满足时才会调用 lcu.playAgain()。
 
 - 进入后秒退按钮
@@ -49,9 +52,6 @@ git fetch enhance
 
 ## bug
 
-- 退出选择游戏模式仍会自动开始，切换页面就停止（做不到）
-- 点击玩家对战，自动跳到了人机对战，改不了模式
-- 在房间内有时换不了模式，这个没能复现
 
 ## 等待上游
 
@@ -67,7 +67,7 @@ git fetch enhance
 - 自动重连❗ 没这个需求，有时候手动退出，自动重连不是我们想要的
 - 战绩页面移植阿卡丽的特色--太复杂不做
 - 锁定配置是命令时非声明式，使用外部工具改状态后并不会同步状态，手动再点一次就好了，没必要做的很复杂状态判断等功能
-
+- 无法切换模式（有惩罚的时候开始了就无法切换）这个是联盟客户端默认逻辑不是插件问题
 
 ```txt
 benchEnabled 不是模式名，它只是 ChampSelectSession 里的一个开关，意思是这局选人里有没有“替补席 / 可换英雄池”。它会在大乱斗、海克斯大乱斗这类有 bench 的选人里为 true，但它本身不能用来判断是不是海克斯大乱斗。

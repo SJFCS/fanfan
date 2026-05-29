@@ -1050,13 +1050,15 @@ export function CustomPage() {
 
   const [globalParticle, setGlobalParticle] = useState(store.get('globalParticle'))
   const [hideProfileOverviewBackdrop, setHideProfileOverviewBackdrop] = useState(store.get('hideProfileOverviewBackdrop'))
-    useEffect(() => {
-      const unsubs = [
-        store.onChange('globalParticle', setGlobalParticle),
-        store.onChange('hideProfileOverviewBackdrop', setHideProfileOverviewBackdrop),
-      ]
-      return () => unsubs.forEach((fn) => fn())
-    }, [])
+  const [hideRoomBackdrop, setHideRoomBackdrop] = useState(store.get('hideRoomBackdrop'))
+  useEffect(() => {
+    const unsubs = [
+      store.onChange('globalParticle', setGlobalParticle),
+      store.onChange('hideProfileOverviewBackdrop', setHideProfileOverviewBackdrop),
+      store.onChange('hideRoomBackdrop', setHideRoomBackdrop),
+    ]
+    return () => unsubs.forEach((fn) => fn())
+  }, [])
 
   return (
     <div
@@ -1449,6 +1451,15 @@ export function CustomPage() {
                 <SonaSwitch
                   checked={hideProfileOverviewBackdrop}
                   onChange={(v) => { setHideProfileOverviewBackdrop(v); store.set('hideProfileOverviewBackdrop', v) }}
+                />
+              </SettingCard>
+              <SettingCard
+                title={t('beautify.roomBackdrop.title')}
+                description={t('beautify.roomBackdrop.description')}
+              >
+                <SonaSwitch
+                  checked={hideRoomBackdrop}
+                  onChange={(v) => { setHideRoomBackdrop(v); store.set('hideRoomBackdrop', v) }}
                 />
               </SettingCard>
             </div>

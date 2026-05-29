@@ -107,6 +107,8 @@ export interface SonaConfig {
   beautifyWallpaperMode: boolean
   /** 隐藏生涯总览页的背景图与遮罩 */
   hideProfileOverviewBackdrop: boolean
+  /** 隐藏组队房间页的模式背景图 */
+  hideRoomBackdrop: boolean
   /** 主页背景图片：assets 目录下的相对路径 */
   beautifyHomepageBackgroundAssetPath: string | null
   /** 主页壁纸资源：从美化资源区复制引用的 assets 相对路径列表 */
@@ -264,6 +266,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   globalParticle: false,
   beautifyWallpaperMode: false,
   hideProfileOverviewBackdrop: false,
+  hideRoomBackdrop: false,
   beautifyHomepageBackgroundAssetPath: null,
   beautifyHomepageBackgroundAssetPaths: [],
   beautifyHomepageBackgroundRandom: false,
