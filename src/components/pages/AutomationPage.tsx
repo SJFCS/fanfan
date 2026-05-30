@@ -148,6 +148,7 @@ export function AutomationPage() {
   // 延迟值在 UI 里用字符串存，避免"删到空 → 变 NaN"、"输到一半"等中间态被推回 store
   const [autoAcceptDelayMax, setAutoAcceptDelayMax] = useState(formatAutoAcceptDelaySecondsFromMs(store.get('autoAcceptDelayMax')))
   const [autoReturnToLobby, setAutoReturnToLobby] = useState(store.get('autoReturnToLobby'))
+  const [autoFastReturnToLobby, setAutoFastReturnToLobby] = useState(store.get('autoFastReturnToLobby'))
   const [autoMatchmaking, setAutoMatchmaking] = useState(store.get('autoMatchmaking'))
   const [autoMatchmakingMinimumMembers, setAutoMatchmakingMinimumMembers] = useState(String(store.get('autoMatchmakingMinimumMembers')))
   const [autoMatchmakingDelaySeconds, setAutoMatchmakingDelaySeconds] = useState(String(store.get('autoMatchmakingDelaySeconds')))
@@ -181,6 +182,7 @@ export function AutomationPage() {
       store.onChange('readyCheckReselect', setReadyCheckReselect),
       store.onChange('autoAcceptDelayMax', (v) => setAutoAcceptDelayMax(formatAutoAcceptDelaySecondsFromMs(v))),
       store.onChange('autoReturnToLobby', setAutoReturnToLobby),
+      store.onChange('autoFastReturnToLobby', setAutoFastReturnToLobby),
       store.onChange('autoMatchmaking', setAutoMatchmaking),
       store.onChange('autoMatchmakingMinimumMembers', (v) => setAutoMatchmakingMinimumMembers(String(v))),
       store.onChange('autoMatchmakingDelaySeconds', (v) => setAutoMatchmakingDelaySeconds(String(v))),
@@ -306,6 +308,11 @@ export function AutomationPage() {
     store.set('autoReturnToLobby', enabled)
   }
 
+  const handleAutoFastReturnChange = (enabled: boolean) => {
+    setAutoFastReturnToLobby(enabled)
+    store.set('autoFastReturnToLobby', enabled)
+  }
+
   const autoReturnDisabled = !autoHonor
 
   const handleAutoMatchmakingChange = (enabled: boolean) => {
@@ -351,6 +358,43 @@ export function AutomationPage() {
           />
         </SettingCard>
         <SettingCard
+          title={t('tools.autoMatchmaking.title')}
+          description={t('tools.autoMatchmaking.description')}
+        >
+          <SonaSwitch
+            checked={autoMatchmaking}
+            onChange={handleAutoMatchmakingChange}
+          />
+        </SettingCard>
+        <SettingCard
+          title={t('tools.autoFastReturn.title')}
+          description={t('tools.autoFastReturn.description')}
+        >
+          <SonaSwitch
+            checked={autoFastReturnToLobby}
+            onChange={handleAutoFastReturnChange}
+          />
+        </SettingCard>
+        {/* <SettingCard
+          title={t('tools.autoHonor.title')}
+          description={t('tools.autoHonor.description')}
+        >
+          <SonaSwitch
+            checked={autoHonor}
+            onChange={handleAutoHonorChange}
+          />
+        </SettingCard> */}
+        {/* <SettingCard
+          title={t('tools.autoReturn.title')}
+          description={autoReturnDisabled ? t('tools.autoReturn.requiresHonor') : t('tools.autoReturn.description')}
+        >
+          <SonaSwitch
+            checked={autoReturnToLobby && autoHonor}
+            onChange={handleAutoReturnChange}
+            disabled={autoReturnDisabled}
+          />
+        </SettingCard> */}
+        <SettingCard
           title={t('tools.readyCheckReselect.title')}
           description={t('tools.readyCheckReselect.description')}
         >
@@ -360,34 +404,6 @@ export function AutomationPage() {
               setReadyCheckReselect(v)
               store.set('readyCheckReselect', v)
             }}
-          />
-        </SettingCard>
-        <SettingCard
-          title={t('tools.autoHonor.title')}
-          description={t('tools.autoHonor.description')}
-        >
-          <SonaSwitch
-            checked={autoHonor}
-            onChange={handleAutoHonorChange}
-          />
-        </SettingCard>
-        <SettingCard
-          title={t('tools.autoReturn.title')}
-          description={autoReturnDisabled ? t('tools.autoReturn.requiresHonor') : t('tools.autoReturn.description')}
-        >
-          <SonaSwitch
-            checked={autoReturnToLobby && autoHonor}
-            onChange={handleAutoReturnChange}
-            disabled={autoReturnDisabled}
-          />
-        </SettingCard>
-        <SettingCard
-          title={t('tools.autoMatchmaking.title')}
-          description={t('tools.autoMatchmaking.description')}
-        >
-          <SonaSwitch
-            checked={autoMatchmaking}
-            onChange={handleAutoMatchmakingChange}
           />
         </SettingCard>
       </SettingGroup>

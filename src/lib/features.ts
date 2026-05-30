@@ -33,6 +33,7 @@ import { updateCustomProfileBg } from '@/lib/features/profile-background'
 import { updateCustomBanner } from '@/lib/features/custom-banner'
 import { updateGameAnalysisPopup } from '@/lib/features/game-analysis-popup'
 import { updateAutoReturnToLobby } from '@/lib/features/auto-return-to-lobby'
+import { updateAutoFastReturnToLobby } from '@/lib/features/auto-fast-return-to-lobby'
 import { isAutoMatchmakingEnabledForCurrentLobby, refreshAutoMatchmakingConfig, updateAutoMatchmaking } from '@/lib/features/auto-matchmaking'
 import { updateOpggBuildRecommendation } from '@/lib/features/opgg-build-recommendation'
 import { updateBeautifyCustomAvatar } from '@/lib/features/beautify-client/custom-avatar'
@@ -945,20 +946,34 @@ export function initFeatures() {
   })
 
   const syncAutoReturnToLobby = () => {
-    const enabled = store.get('autoHonor') && store.get('autoReturnToLobby')
+    const enabled = store.get('autoHonor') && store.get('autoReturnToLobby') && !store.get('autoFastReturnToLobby')
     updateAutoReturnToLobby(enabled)
+  }
+
+  const syncAutoHonor = () => {
+    updateAutoHonor(store.get('autoHonor') && !store.get('autoFastReturnToLobby'))
+  }
+
+  const syncAutoFastReturnToLobby = () => {
+    updateAutoFastReturnToLobby(store.get('autoFastReturnToLobby'))
   }
 
   const syncAutoMatchmaking = () => {
     updateAutoMatchmaking(isAutoMatchmakingEnabledForCurrentLobby())
   }
 
-  updateAutoHonor(store.get('autoHonor'))
+  syncAutoFastReturnToLobby()
+  syncAutoHonor()
   store.onChange('autoHonor', (enabled) => {
-    updateAutoHonor(enabled)
+    syncAutoHonor()
     if (!enabled && store.get('autoReturnToLobby')) {
       store.set('autoReturnToLobby', false)
     }
+    syncAutoReturnToLobby()
+  })
+  store.onChange('autoFastReturnToLobby', () => {
+    syncAutoFastReturnToLobby()
+    syncAutoHonor()
     syncAutoReturnToLobby()
   })
 

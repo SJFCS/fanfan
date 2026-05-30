@@ -238,6 +238,8 @@ export interface SonaConfig {
   gameAnalysisPopup: boolean
   /** 对局结束后自动返回房间 */
   autoReturnToLobby: boolean
+  /** 对局结束后急速返回房间，不等待点赞完成 */
+  autoFastReturnToLobby: boolean
   /** 对局结束后返回房间的后续行为：queue=自动匹配，lobby=仅返回房间 */
   autoReturnMode: 'queue' | 'lobby'
   /** 自动匹配 */
@@ -349,6 +351,7 @@ const DEFAULT_CONFIG: SonaConfig = {
   champSelectQuitButton: false,
   gameAnalysisPopup: false,
   autoReturnToLobby: false,
+  autoFastReturnToLobby: false,
   autoReturnMode: 'queue',
   autoMatchmaking: false,
   lobbyHeaderAutoMatchmakingEnabled: true,
