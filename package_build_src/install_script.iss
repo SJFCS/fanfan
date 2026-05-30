@@ -1,6 +1,6 @@
 ﻿; 基础信息（按需修改）
 #define MyAppName        "FanFan"
-#define MyAppVersion     "1.4.3.3"
+#define MyAppVersion     "1.4.4"
 #define MyAppID          "B74B7C7D-C21A-42B1-B419-9D63B484EEF4"
 
 [Files]

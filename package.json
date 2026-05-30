@@ -1,7 +1,7 @@
 {
   "name": "fanfan",
   "private": true,
-  "version": "1.4.1",
+  "version": "1.4.4",
   "type": "module",
   "description": "FanFan - A League of Legends client plugin for Pengu Loader",
   "license": "AGPL-3.0",
