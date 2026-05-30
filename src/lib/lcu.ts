@@ -735,7 +735,7 @@ class LCUManager {
 
   /** 秒退英雄选择阶段（与 LeagueAkari 的 teambuilder-draft quitV2 调用保持一致）。 */
   dodgeChampSelect(): Promise<unknown> {
-    const args = JSON.stringify(['', 'teambuilder-draft', 'quitV2', ''])
+    const args = '["", "teambuilder-draft", "quitV2", ""]'
     const params = new URLSearchParams({
       destination: 'lcdsServiceProxy',
       method: 'call',

@@ -9,7 +9,7 @@
  * 方案：
  *   监听 gameflow-phase，进入 ChampSelect 时注册 injector 任务：
  *     - 若 `.bottom-right-buttons` 里已有 `.quit-button`（自定义对局）→ 不管
- *     - 否则克隆一个长得一样的按钮插入容器末尾，点击走 Sona 的确认弹窗 → `lcu.dodgeChampSelect()`
+ *     - 否则克隆一个长得一样的按钮插入容器末尾，点击确认后立即调用 `lcu.dodgeChampSelect()`
  *
  *   为什么选 DOM 注入而不是 Ember hook：
  *     1. 原生 `.quit-button` 的显隐由 `isCustomGame` 等字段控制，即便用 mixin
