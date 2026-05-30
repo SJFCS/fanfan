@@ -733,20 +733,18 @@ class LCUManager {
     return del('/lol-lobby/v2/lobby')
   }
 
-  /**
-   * 秒退英雄选择阶段（dodge ChampSelect）
-   *
-   * 走客户端自己的 TeamBuilder 底层退房接口——这是从自定义房间抓包得到的
-   * 真正被客户端调用的端点，比 LCDS 代理（`/lol-login/v1/session/invoke`）更干净：
-   *   - 无需 URL encode args / 构造 LCDS 调用签名
-   *   - 无需 body（纯 POST）
-   *   - 路径本身就清晰表达了语义
-   *
-   * 注：这会吃逃跑惩罚（降低排位或禁止匹配一段时间），由调用方自行确认场景。
-   */
+  /** 秒退英雄选择阶段（与 LeagueAkari 的 teambuilder-draft quitV2 调用保持一致）。 */
   dodgeChampSelect(): Promise<unknown> {
-    // 纯 POST，无 body
-    return post('/lol-lobby-team-builder/champ-select/v1/session/quit')
+    const args = JSON.stringify(['', 'teambuilder-draft', 'quitV2', ''])
+    const params = new URLSearchParams({
+      destination: 'lcdsServiceProxy',
+      method: 'call',
+      args,
+    })
+
+    return post(`/lol-login/v1/session/invoke?${params}`, {
+      data: ['', 'teambuilder-draft', 'quitV2', ''],
+    })
   }
 
   // ==================== 匹配 ====================

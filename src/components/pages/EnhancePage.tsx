@@ -31,6 +31,7 @@ export function EnhancePage() {
   const [sideIndicator, setSideIndicator] = useState(store.get('sideIndicator'))
   const [sideIndicatorMsgType, setSideIndicatorMsgType] = useState(store.get('sideIndicatorMsgType'))
   const [benchNoCooldown, setBenchNoCooldown] = useState(store.get('benchNoCooldown'))
+  const [champSelectQuitButton, setChampSelectQuitButton] = useState(store.get('champSelectQuitButton'))
   const [lobbyEnhancementFetchCount, setLobbyEnhancementFetchCount] = useState(store.get('lobbyEnhancementFetchCount'))
   const [lobbyEnhancementDisplayMode, setLobbyEnhancementDisplayMode] = useState(store.get('lobbyEnhancementDisplayMode'))
   const [lobbyEnhancement, setLobbyEnhancement] = useState(store.get('lobbyEnhancement'))
@@ -51,6 +52,7 @@ export function EnhancePage() {
       store.onChange('sideIndicator', setSideIndicator),
       store.onChange('sideIndicatorMsgType', setSideIndicatorMsgType),
       store.onChange('benchNoCooldown', setBenchNoCooldown),
+      store.onChange('champSelectQuitButton', setChampSelectQuitButton),
       store.onChange('lobbyEnhancementFetchCount', setLobbyEnhancementFetchCount),
       store.onChange('lobbyEnhancementDisplayMode', setLobbyEnhancementDisplayMode),
       store.onChange('lobbyEnhancement', setLobbyEnhancement),
@@ -186,6 +188,15 @@ export function EnhancePage() {
           />
         </SettingCard>
         <SettingCard
+          title={t('tools.champSelectQuitButton.title')}
+          description={t('tools.champSelectQuitButton.description')}
+        >
+          <SonaSwitch
+            checked={champSelectQuitButton}
+            onChange={(v) => { setChampSelectQuitButton(v); store.set('champSelectQuitButton', v) }}
+          />
+        </SettingCard>
+        <SettingCard
           title={t('tools.inGameAutoPopup.title')}
           description={t('tools.inGameAutoPopup.description')}
         >
@@ -219,16 +230,6 @@ export function EnhancePage() {
             onChange={(v) => { setBalanceBuffTooltip(v); store.set('balanceBuffTooltip', v) }}
           />
         </SettingCard>
-        {/* 这个选人阶段退出，没找到合适的LCU接口，暂时加不了 */}
-        {/* <SettingCard
-          title="选人阶段退出按钮"
-          description="非自定义对局的英雄选择里客户端不会显示退出按钮，Sona 帮你补一个。点击后会弹确认窗，秒退会扣逃跑分。"
-        >
-          <SonaSwitch
-            checked={champSelectQuitButton}
-            onChange={(v) => { setChampSelectQuitButton(v); store.set('champSelectQuitButton', v) }}
-          />
-        </SettingCard> */}
       </SettingGroup>
     </div>
   )
