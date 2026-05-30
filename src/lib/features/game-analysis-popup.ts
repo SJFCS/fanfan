@@ -11,8 +11,20 @@ import { GameAnalysisModal } from '@/components/ui/GameAnalysisModal'
 /** GameAnalysisModal 的独立 React root */
 let gameAnalysisRoot: Root | null = null
 let gameAnalysisContainer: HTMLDivElement | null = null
+let currentGameAnalysisPhase: GameflowPhase | null = null
+let gameAnalysisPhaseRunId = 0
+
+function isGameAnalysisPopupActive(runId: number) {
+  return currentGameAnalysisPhase === 'InProgress' && runId === gameAnalysisPhaseRunId
+}
+
+function shouldResetPopupGameId(phase: GameflowPhase) {
+  return phase !== 'GameStart' && phase !== 'Reconnect'
+}
 
 function showGameAnalysisModal() {
+  if (currentGameAnalysisPhase !== 'InProgress') return
+
   if (!gameAnalysisContainer) {
     gameAnalysisContainer = document.createElement('div')
     gameAnalysisContainer.id = 'sona-game-analysis-root'
@@ -87,53 +99,74 @@ let lastPopupGameId = 0
 
 let gameAnalysisPopupUnsub: (() => void) | null = null
 
+function ensureGameAnalysisButtonRegistered() {
+  if (gameAnalysisBtnRegistered) return
+
+  injector.register(tryInjectGameAnalysisButton)
+  gameAnalysisBtnRegistered = true
+}
+
+function cleanupGameAnalysisRuntime(phase?: GameflowPhase) {
+  if (!phase || shouldResetPopupGameId(phase)) {
+    lastPopupGameId = 0
+  }
+
+  if (gameAnalysisBtnRegistered) {
+    injector.unregister(tryInjectGameAnalysisButton)
+    gameAnalysisBtnRegistered = false
+  }
+  cleanupGameAnalysisButton()
+  cleanupGameAnalysisModal()
+}
+
+function maybeShowGameAnalysisAutoPopup(runId: number) {
+  lcu.getGameflowSession()
+    .then((session) => {
+      if (!isGameAnalysisPopupActive(runId)) return
+
+      const gid = session.gameData?.gameId ?? 0
+      if (gid > 0 && gid !== lastPopupGameId) {
+        lastPopupGameId = gid
+        showGameAnalysisModal()
+      }
+    })
+    .catch(() => {
+      if (!isGameAnalysisPopupActive(runId) || lastPopupGameId === -1) return
+
+      lastPopupGameId = -1
+      showGameAnalysisModal()
+    })
+}
+
+function handleGameAnalysisPhase(phase: GameflowPhase) {
+  currentGameAnalysisPhase = phase
+  const runId = ++gameAnalysisPhaseRunId
+
+  if (phase === 'InProgress') {
+    ensureGameAnalysisButtonRegistered()
+    maybeShowGameAnalysisAutoPopup(runId)
+    return
+  }
+
+  cleanupGameAnalysisRuntime(phase)
+}
+
 export function updateGameAnalysisPopup(enabled: boolean) {
   if (enabled && !gameAnalysisPopupUnsub) {
     gameAnalysisPopupUnsub = lcu.observe(LcuEventUri.GAMEFLOW_PHASE_CHANGE, (event: LCUEventMessage) => {
       const phase = event.data as GameflowPhase
-      if (phase === 'InProgress') {
-        // 注册内嵌按钮注入
-        if (!gameAnalysisBtnRegistered) {
-          injector.register(tryInjectGameAnalysisButton)
-          gameAnalysisBtnRegistered = true
-        }
-        // 查询当前 gameId 避免重连时重复弹窗
-        lcu.getGameflowSession()
-          .then((session) => {
-            const gid = session.gameData?.gameId ?? 0
-            if (gid > 0 && gid !== lastPopupGameId) {
-              lastPopupGameId = gid
-              showGameAnalysisModal()
-            }
-          })
-          .catch(() => {
-            // session 查询失败也尝试弹窗（可能是自定义等特殊情况）
-            showGameAnalysisModal()
-          })
-      } else if (phase === 'WaitingForStats' || phase === 'PreEndOfGame' || phase === 'EndOfGame') {
-        // 游戏已结束（WaitingForStats / PreEndOfGame / EndOfGame / None / Lobby 等）
-        // 重置状态并关闭弹窗
-        lastPopupGameId = 0
-        // 取消按钮注入
-        if (gameAnalysisBtnRegistered) {
-          injector.unregister(tryInjectGameAnalysisButton)
-          gameAnalysisBtnRegistered = false
-        }
-        cleanupGameAnalysisButton()
-        cleanupGameAnalysisModal()
-      }
+      handleGameAnalysisPhase(phase)
     })
+    lcu.getGameflowPhase()
+      .then(handleGameAnalysisPhase)
+      .catch(() => { /* ignore */ })
     logger.info('Game analysis popup enabled ✓')
   } else if (!enabled && gameAnalysisPopupUnsub) {
     gameAnalysisPopupUnsub()
     gameAnalysisPopupUnsub = null
-    lastPopupGameId = 0
-    if (gameAnalysisBtnRegistered) {
-      injector.unregister(tryInjectGameAnalysisButton)
-      gameAnalysisBtnRegistered = false
-    }
-    cleanupGameAnalysisButton()
-    cleanupGameAnalysisModal()
+    currentGameAnalysisPhase = null
+    gameAnalysisPhaseRunId++
+    cleanupGameAnalysisRuntime()
     logger.info('Game analysis popup disabled')
   }
 }

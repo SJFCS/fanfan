@@ -98,7 +98,10 @@ let activePanelKey = ''
 let panelReactRoot: Root | null = null
 let inGameModalRoot: Root | null = null
 let inGameModalContainer: HTMLDivElement | null = null
+let inGameModalCloseTimer: number | null = null
 let inGameModalRenderToken = 0
+let currentGameflowPhase: GameflowPhase | null = null
+let inGameBuildPhaseRunId = 0
 let lastAppliedItemSetKey = ''
 let lastAppliedRuneKey = ''
 let lastAppliedSpellKey = ''
@@ -1116,9 +1119,26 @@ function closePanel() {
   }
 }
 
+function isInGameBuildUiActive(runId?: number) {
+  return currentGameflowPhase === 'InProgress' && (runId == null || runId === inGameBuildPhaseRunId)
+}
+
+function shouldResetInGameAutoPopupGameId(phase: GameflowPhase) {
+  return phase !== 'GameStart' && phase !== 'Reconnect'
+}
+
+function clearInGameModalCloseTimer() {
+  if (inGameModalCloseTimer != null) {
+    window.clearTimeout(inGameModalCloseTimer)
+    inGameModalCloseTimer = null
+  }
+}
+
 function closeInGameBuildRecommendationModal() {
   if (!inGameModalRoot) return
 
+  clearInGameModalCloseTimer()
+  inGameModalRenderToken++
   const close = () => closeInGameBuildRecommendationModal()
   inGameModalRoot.render(
     createElement(Modal, {
@@ -1131,7 +1151,8 @@ function closeInGameBuildRecommendationModal() {
     }),
   )
 
-  window.setTimeout(() => {
+  inGameModalCloseTimer = window.setTimeout(() => {
+    inGameModalCloseTimer = null
     if (inGameModalRoot) {
       inGameModalRoot.unmount()
       inGameModalRoot = null
@@ -1144,6 +1165,9 @@ function closeInGameBuildRecommendationModal() {
 }
 
 function cleanupInGameBuildRecommendationModal() {
+  clearInGameModalCloseTimer()
+  inGameModalRenderToken++
+
   if (inGameModalRoot) {
     inGameModalRoot.unmount()
     inGameModalRoot = null
@@ -1159,6 +1183,9 @@ function renderInGameBuildRecommendationModal(
   cacheEntry: RecommendationCacheEntry | null,
   token: number,
 ) {
+  if (!isInGameBuildUiActive()) return
+  clearInGameModalCloseTimer()
+
   if (!inGameModalContainer) {
     inGameModalContainer = document.createElement('div')
     inGameModalContainer.id = 'sona-opgg-ingame-modal-root'
@@ -1212,10 +1239,10 @@ function scheduleInGameModalRefresh(
   if (!cacheEntry || cacheEntry.data !== undefined || cacheEntry.error) return
 
   cacheEntry.promise.then(() => {
-    if (token !== inGameModalRenderToken || !inGameModalRoot) return
+    if (!isInGameBuildUiActive() || token !== inGameModalRenderToken || !inGameModalRoot) return
     renderInGameBuildRecommendationModal(context, cacheEntry, token)
   }).catch(() => {
-    if (token !== inGameModalRenderToken || !inGameModalRoot) return
+    if (!isInGameBuildUiActive() || token !== inGameModalRenderToken || !inGameModalRoot) return
     renderInGameBuildRecommendationModal(context, cacheEntry, token)
   })
 }
@@ -1247,29 +1274,36 @@ async function resolveInGameRecommendationContext(): Promise<RecommendationConte
   }
 }
 
-export async function showOpggBuildRecommendationModal() {
+export async function showOpggBuildRecommendationModal(runId?: number) {
+  if (!isInGameBuildUiActive(runId)) return
+
   const context = await resolveInGameRecommendationContext()
+  if (!isInGameBuildUiActive(runId)) return
+
   currentContext = { ...context }
   const cacheEntry = ensureRecommendationPrefetch(context)
   const token = ++inGameModalRenderToken
   renderInGameBuildRecommendationModal(context, cacheEntry, token)
 }
 
-function maybeShowInGameBuildRecommendationAutoPopup() {
+function maybeShowInGameBuildRecommendationAutoPopup(runId = inGameBuildPhaseRunId) {
   if (store.get('inGameAutoPopupMode') !== 'buildRecommendation') return
+  if (!isInGameBuildUiActive(runId)) return
 
   void (async () => {
     try {
       const session = await lcu.getGameflowSession()
+      if (!isInGameBuildUiActive(runId) || store.get('inGameAutoPopupMode') !== 'buildRecommendation') return
+
       const gameId = session.gameData?.gameId ?? 0
       if (gameId > 0 && gameId === lastInGameAutoPopupGameId) return
       lastInGameAutoPopupGameId = gameId > 0 ? gameId : -1
-      await showOpggBuildRecommendationModal()
+      await showOpggBuildRecommendationModal(runId)
     } catch (err) {
-      if (lastInGameAutoPopupGameId === -1) return
+      if (!isInGameBuildUiActive(runId) || store.get('inGameAutoPopupMode') !== 'buildRecommendation' || lastInGameAutoPopupGameId === -1) return
       lastInGameAutoPopupGameId = -1
       try {
-        await showOpggBuildRecommendationModal()
+        await showOpggBuildRecommendationModal(runId)
       } catch (modalErr) {
         logger.warn('[OPGG] 自动打开游戏内配装推荐弹窗失败:', modalErr || err)
       }
@@ -1575,24 +1609,34 @@ function unmount(resetContext = true) {
   spellApplyInFlightKeys.clear()
 }
 
+function handleOpggGameflowPhase(phase: GameflowPhase) {
+  currentGameflowPhase = phase
+  const runId = ++inGameBuildPhaseRunId
+
+  if (phase === 'ChampSelect') {
+    lastInGameAutoPopupGameId = 0
+    unregisterInGameBuildButton()
+    logger.info('[OPGG] 进入 ChampSelect，等待本地英雄锁定')
+    scheduleRefreshWhenChampionLocked()
+  } else if (phase === 'InProgress') {
+    unmount()
+    registerInGameBuildButton()
+    maybeShowInGameBuildRecommendationAutoPopup(runId)
+  } else {
+    if (shouldResetInGameAutoPopupGameId(phase)) {
+      lastInGameAutoPopupGameId = 0
+    }
+    unregisterInGameBuildButton()
+    unmount()
+  }
+}
+
 function startOpggListeners() {
   if (phaseUnsub) return
 
   phaseUnsub = lcu.observe(LcuEventUri.GAMEFLOW_PHASE_CHANGE, (event: LCUEventMessage) => {
     const phase = event.data as GameflowPhase
-    if (phase === 'ChampSelect') {
-      unregisterInGameBuildButton()
-      logger.info('[OPGG] 进入 ChampSelect，等待本地英雄锁定')
-      scheduleRefreshWhenChampionLocked()
-    } else if (phase === 'InProgress') {
-      unmount()
-      registerInGameBuildButton()
-      maybeShowInGameBuildRecommendationAutoPopup()
-    } else {
-      lastInGameAutoPopupGameId = 0
-      unregisterInGameBuildButton()
-      unmount()
-    }
+    handleOpggGameflowPhase(phase)
   })
 
   champSelectUnsub = lcu.observe(LcuEventUri.CHAMP_SELECT, (event: LCUEventMessage) => {
@@ -1610,12 +1654,7 @@ function startOpggListeners() {
   currentRunePageUnsub = lcu.observe(CURRENT_RUNE_PAGE_EVENT_URI, handleCurrentRunePageEvent)
 
   lcu.getGameflowPhase().then((phase) => {
-    if (phase === 'ChampSelect') {
-      scheduleRefreshWhenChampionLocked()
-    } else if (phase === 'InProgress') {
-      registerInGameBuildButton()
-      maybeShowInGameBuildRecommendationAutoPopup()
-    }
+    handleOpggGameflowPhase(phase)
   }).catch(() => { /* ignore */ })
 
   logger.info('[OPGG] 配装推荐接管已启用 ✓')
@@ -1626,18 +1665,15 @@ export function updateOpggBuildRecommendation(enabled: boolean) {
     startOpggListeners()
   } else if (enabled && phaseUnsub) {
     lcu.getGameflowPhase().then((phase) => {
-      if (phase === 'ChampSelect') {
-        scheduleRefreshWhenChampionLocked()
-      } else if (phase === 'InProgress') {
-        registerInGameBuildButton()
-        maybeShowInGameBuildRecommendationAutoPopup()
-      }
+      handleOpggGameflowPhase(phase)
     }).catch(() => { /* ignore */ })
   } else if (!enabled) {
     if (!phaseUnsub) return
 
     phaseUnsub()
     phaseUnsub = null
+    currentGameflowPhase = null
+    inGameBuildPhaseRunId++
     lastInGameAutoPopupGameId = 0
     unregisterInGameBuildButton()
     if (champSelectUnsub) {
