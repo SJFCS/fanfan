@@ -8,13 +8,21 @@ import { sleep } from '@/lib/utils'
 const FRIENDS_URI = '/lol-chat/v1/friends'
 const SONA_FRIEND_STATUS_ATTR = 'data-sona-enhanced-friend-status'
 const SONA_FRIEND_STATUS_ORIGINAL_ATTR = 'data-sona-enhanced-friend-status-original'
+const STABILIZE_REFRESH_DELAYS_MS = [1000, 5000, 15000, 30000]
+const RECONCILE_REFRESH_INTERVAL_MS = 10_000
 
 interface EnhancedFriendStatusInfo {
   displayName: string
+  gameId: number
   startedAt: number
   queueId: number
   fallbackQueueName: string
   isTft: boolean
+}
+
+interface FriendGameSnapshot {
+  gameId: number
+  startedAt: number
 }
 
 let enhancedFriendStatusRegistered = false
@@ -23,7 +31,10 @@ let enhancedFriendStatusUnsub: (() => void) | null = null
 let enhancedFriendStatusRefreshTimer: number | null = null
 let enhancedFriendStatusTickTimer: number | null = null
 let enhancedFriendStatusRefreshInFlight: Promise<void> | null = null
+let enhancedFriendStatusStabilizeTimers: number[] = []
+let enhancedFriendStatusLastRefreshAt = 0
 let enhancedFriendStatusMap = new Map<string, EnhancedFriendStatusInfo>()
+let enhancedFriendStatusLastGameMap = new Map<string, FriendGameSnapshot>()
 
 function getFriendDisplayName(friend: ChatFriend): string {
   return friend.gameName || friend.name
@@ -44,9 +55,18 @@ function isTftStatus(friend: ChatFriend): boolean {
   return friend.lol?.gameMode === 'TFT' || friend.lol?.gameQueueType?.includes('TFT') || friend.lol?.iconOverride === 'companion'
 }
 
+function getLastGameSnapshot(keys: string[]): FriendGameSnapshot | null {
+  for (const key of keys) {
+    const snapshot = enhancedFriendStatusLastGameMap.get(key)
+    if (snapshot) return snapshot
+  }
+
+  return null
+}
+
 function buildFriendStatusInfo(friend: ChatFriend): EnhancedFriendStatusInfo | null {
   const gameId = Number(friend.lol?.gameId || 0)
-  const startedAt = Number(friend.lol?.timeStamp || 0)
+  let startedAt = Number(friend.lol?.timeStamp || 0)
   const queueId = Number(friend.lol?.queueId || 0)
   const gameStatus = friend.lol?.gameStatus
 
@@ -54,9 +74,19 @@ function buildFriendStatusInfo(friend: ChatFriend): EnhancedFriendStatusInfo | n
     return null
   }
 
+  const lastGame = getLastGameSnapshot(getFriendStatusKeys(friend))
+  if (lastGame) {
+    if (lastGame.gameId !== gameId && startedAt <= lastGame.startedAt) {
+      startedAt = Date.now()
+    } else if (lastGame.gameId === gameId && startedAt < lastGame.startedAt) {
+      startedAt = lastGame.startedAt
+    }
+  }
+
   const isTft = isTftStatus(friend)
   return {
     displayName: getFriendDisplayName(friend),
+    gameId,
     startedAt,
     queueId,
     fallbackQueueName: friend.lol?.gameQueueType || friend.lol?.gameMode || '游戏中',
@@ -88,9 +118,14 @@ async function doRefreshEnhancedFriendStatusMap(retries = 5) {
 
         for (const key of getFriendStatusKeys(friend)) {
           nextMap.set(key, info)
+          enhancedFriendStatusLastGameMap.set(key, {
+            gameId: info.gameId,
+            startedAt: info.startedAt,
+          })
         }
       }
 
+      enhancedFriendStatusLastRefreshAt = Date.now()
       enhancedFriendStatusMap = nextMap
       logger.info('[FriendStatus] 刷新游戏中好友状态 → %d 条索引 (attempt %d)', nextMap.size, attempt)
       tryInjectEnhancedFriendStatus()
@@ -118,6 +153,24 @@ function scheduleEnhancedFriendStatusRefresh(delay = 250) {
   }, delay)
 }
 
+function clearEnhancedFriendStatusStabilizeTimers() {
+  enhancedFriendStatusStabilizeTimers.forEach((timer) => window.clearTimeout(timer))
+  enhancedFriendStatusStabilizeTimers = []
+}
+
+function scheduleEnhancedFriendStatusStabilizeRefreshes() {
+  clearEnhancedFriendStatusStabilizeTimers()
+
+  enhancedFriendStatusStabilizeTimers = STABILIZE_REFRESH_DELAYS_MS.map((delay) => {
+    const timer = window.setTimeout(() => {
+      enhancedFriendStatusStabilizeTimers = enhancedFriendStatusStabilizeTimers.filter((item) => item !== timer)
+      void refreshEnhancedFriendStatusMap(0)
+    }, delay)
+
+    return timer
+  })
+}
+
 function formatDuration(startedAt: number): string {
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
   const minutes = Math.floor(elapsedSeconds / 60)
@@ -129,6 +182,18 @@ function formatDuration(startedAt: number): string {
 function formatStatusText(info: EnhancedFriendStatusInfo): string {
   const queueName = info.queueId > 0 ? getQueueName(info.queueId) : info.fallbackQueueName
   return `${queueName} · ${formatDuration(info.startedAt)}`
+}
+
+function hasVisibleInGameFriendStatus(): boolean {
+  return Boolean(document.querySelector('.lol-social-lower-pane-container span.status-message.game-status.dnd'))
+}
+
+function reconcileEnhancedFriendStatusMapIfNeeded() {
+  if (enhancedFriendStatusRefreshInFlight) return
+  if (Date.now() - enhancedFriendStatusLastRefreshAt < RECONCILE_REFRESH_INTERVAL_MS) return
+  if (enhancedFriendStatusMap.size === 0 && !hasVisibleInGameFriendStatus()) return
+
+  void refreshEnhancedFriendStatusMap(0)
 }
 
 function getMemberStatusInfo(member: HTMLElement): EnhancedFriendStatusInfo | null {
@@ -143,7 +208,9 @@ function restoreStatusMessage(statusEl: HTMLElement) {
 
   const original = statusEl.getAttribute(SONA_FRIEND_STATUS_ORIGINAL_ATTR)
   if (original != null) {
-    statusEl.innerText = original
+    if (statusEl.innerText !== original) {
+      statusEl.innerText = original
+    }
   }
   statusEl.removeAttribute(SONA_FRIEND_STATUS_ATTR)
   statusEl.removeAttribute(SONA_FRIEND_STATUS_ORIGINAL_ATTR)
@@ -172,7 +239,10 @@ function tryInjectEnhancedFriendStatus(): boolean {
       statusEl.setAttribute(SONA_FRIEND_STATUS_ATTR, 'true')
     }
 
-    statusEl.innerText = formatStatusText(info)
+    const nextText = formatStatusText(info)
+    if (statusEl.innerText !== nextText) {
+      statusEl.innerText = nextText
+    }
   })
 
   return true
@@ -183,6 +253,7 @@ function startEnhancedFriendStatusTick() {
 
   enhancedFriendStatusTickTimer = window.setInterval(() => {
     if (!enhancedFriendStatusRegistered) return
+    reconcileEnhancedFriendStatusMapIfNeeded()
     tryInjectEnhancedFriendStatus()
   }, 1000)
 }
@@ -205,6 +276,7 @@ export function updateEnhancedFriendGameStatus(enabled: boolean) {
     enhancedFriendStatusUnsub = lcu.observe(FRIENDS_URI, () => {
       scheduleEnhancedFriendStatusRefresh()
     })
+    scheduleEnhancedFriendStatusStabilizeRefreshes()
 
     void refreshEnhancedFriendStatusMap().then(() => {
       if (enhancedFriendStatusRegistered) {
@@ -224,10 +296,13 @@ export function updateEnhancedFriendGameStatus(enabled: boolean) {
       window.clearTimeout(enhancedFriendStatusRefreshTimer)
       enhancedFriendStatusRefreshTimer = null
     }
+    clearEnhancedFriendStatusStabilizeTimers()
     stopEnhancedFriendStatusTick()
 
     enhancedFriendStatusRegistered = false
     enhancedFriendStatusMap.clear()
+    enhancedFriendStatusLastGameMap.clear()
+    enhancedFriendStatusLastRefreshAt = 0
 
     document.querySelectorAll(`[${SONA_FRIEND_STATUS_ATTR}]`).forEach((node) => {
       restoreStatusMessage(node as HTMLElement)
