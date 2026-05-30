@@ -35,6 +35,8 @@ import { translate } from '@/i18n'
 const TARGET_SELECTOR = '.toggle-ability-previews-button'
 const HIJACK_ATTR = 'data-sona-opgg-build-hijacked'
 const PANEL_ID = 'sona-opgg-build-panel'
+const IN_GAME_MODAL_ROOT_ID = 'sona-opgg-ingame-modal-root'
+const IN_GAME_MODAL_SELECTOR = '.sona-opgg-modal-content'
 const IN_GAME_BUILD_BUTTON_ATTR = 'data-sona-opgg-ingame-build'
 const DEFAULT_OPGG_TIER: OpggTier = 'master_plus'
 const SONA_ITEM_SET_TITLE_PREFIX = '[Sona]'
@@ -98,7 +100,6 @@ let activePanelKey = ''
 let panelReactRoot: Root | null = null
 let inGameModalRoot: Root | null = null
 let inGameModalContainer: HTMLDivElement | null = null
-let inGameModalCloseTimer: number | null = null
 let inGameModalRenderToken = 0
 let currentGameflowPhase: GameflowPhase | null = null
 let inGameBuildPhaseRunId = 0
@@ -1127,45 +1128,25 @@ function shouldResetInGameAutoPopupGameId(phase: GameflowPhase) {
   return phase !== 'GameStart' && phase !== 'Reconnect'
 }
 
-function clearInGameModalCloseTimer() {
-  if (inGameModalCloseTimer != null) {
-    window.clearTimeout(inGameModalCloseTimer)
-    inGameModalCloseTimer = null
-  }
+function cleanupStaleInGameBuildRecommendationModalDom(activeContainer: HTMLDivElement | null) {
+  document.querySelectorAll<HTMLElement>('.sona-modal-overlay').forEach((overlay) => {
+    if (overlay.querySelector(IN_GAME_MODAL_SELECTOR)) {
+      overlay.remove()
+    }
+  })
+
+  document.querySelectorAll<HTMLDivElement>(`#${IN_GAME_MODAL_ROOT_ID}`).forEach((container) => {
+    if (container !== activeContainer) {
+      container.remove()
+    }
+  })
 }
 
 function closeInGameBuildRecommendationModal() {
-  if (!inGameModalRoot) return
-
-  clearInGameModalCloseTimer()
-  inGameModalRenderToken++
-  const close = () => closeInGameBuildRecommendationModal()
-  inGameModalRoot.render(
-    createElement(Modal, {
-      open: false,
-      onClose: close,
-      width: 1120,
-      height: 700,
-      closable: false,
-      children: createElement('div'),
-    }),
-  )
-
-  inGameModalCloseTimer = window.setTimeout(() => {
-    inGameModalCloseTimer = null
-    if (inGameModalRoot) {
-      inGameModalRoot.unmount()
-      inGameModalRoot = null
-    }
-    if (inGameModalContainer) {
-      inGameModalContainer.remove()
-      inGameModalContainer = null
-    }
-  }, 240)
+  cleanupInGameBuildRecommendationModal()
 }
 
 function cleanupInGameBuildRecommendationModal() {
-  clearInGameModalCloseTimer()
   inGameModalRenderToken++
 
   if (inGameModalRoot) {
@@ -1176,6 +1157,8 @@ function cleanupInGameBuildRecommendationModal() {
     inGameModalContainer.remove()
     inGameModalContainer = null
   }
+
+  cleanupStaleInGameBuildRecommendationModalDom(null)
 }
 
 function renderInGameBuildRecommendationModal(
@@ -1184,13 +1167,15 @@ function renderInGameBuildRecommendationModal(
   token: number,
 ) {
   if (!isInGameBuildUiActive()) return
-  clearInGameModalCloseTimer()
 
   if (!inGameModalContainer) {
+    cleanupStaleInGameBuildRecommendationModalDom(null)
     inGameModalContainer = document.createElement('div')
-    inGameModalContainer.id = 'sona-opgg-ingame-modal-root'
+    inGameModalContainer.id = IN_GAME_MODAL_ROOT_ID
     document.body.appendChild(inGameModalContainer)
     inGameModalRoot = createRoot(inGameModalContainer)
+  } else if (!inGameModalContainer.isConnected) {
+    document.body.appendChild(inGameModalContainer)
   }
 
   const recommendation = cacheEntry?.data ?? null
@@ -1309,6 +1294,18 @@ function maybeShowInGameBuildRecommendationAutoPopup(runId = inGameBuildPhaseRun
       }
     }
   })()
+}
+
+function rememberCurrentInGameAutoPopupGameId(runId: number) {
+  lcu.getGameflowSession()
+    .then((session) => {
+      if (!isInGameBuildUiActive(runId)) return
+      lastInGameAutoPopupGameId = session.gameData?.gameId ?? -1
+    })
+    .catch(() => {
+      if (!isInGameBuildUiActive(runId)) return
+      lastInGameAutoPopupGameId = -1
+    })
 }
 
 async function openRecommendationPanel(anchor: HTMLElement, contextOverride?: RecommendationContext) {
@@ -1513,7 +1510,7 @@ function tryInjectInGameBuildButton(): boolean {
   btn.setAttribute(IN_GAME_BUILD_BUTTON_ATTR, 'true')
   btn.textContent = '配装推荐'
   btn.style.display = 'block'
-  btn.style.marginTop = '12px'
+  btn.style.marginTop = '8px'
 
   btn.addEventListener('click', (event) => {
     event.stopPropagation()
@@ -1609,7 +1606,8 @@ function unmount(resetContext = true) {
   spellApplyInFlightKeys.clear()
 }
 
-function handleOpggGameflowPhase(phase: GameflowPhase) {
+function handleOpggGameflowPhase(phase: GameflowPhase, autoPopup = true) {
+  const previousPhase = currentGameflowPhase
   currentGameflowPhase = phase
   const runId = ++inGameBuildPhaseRunId
 
@@ -1621,7 +1619,11 @@ function handleOpggGameflowPhase(phase: GameflowPhase) {
   } else if (phase === 'InProgress') {
     unmount()
     registerInGameBuildButton()
-    maybeShowInGameBuildRecommendationAutoPopup(runId)
+    if (autoPopup && previousPhase !== 'InProgress') {
+      maybeShowInGameBuildRecommendationAutoPopup(runId)
+    } else {
+      rememberCurrentInGameAutoPopupGameId(runId)
+    }
   } else {
     if (shouldResetInGameAutoPopupGameId(phase)) {
       lastInGameAutoPopupGameId = 0
@@ -1634,9 +1636,11 @@ function handleOpggGameflowPhase(phase: GameflowPhase) {
 function startOpggListeners() {
   if (phaseUnsub) return
 
+  cleanupInGameBuildRecommendationModal()
+
   phaseUnsub = lcu.observe(LcuEventUri.GAMEFLOW_PHASE_CHANGE, (event: LCUEventMessage) => {
     const phase = event.data as GameflowPhase
-    handleOpggGameflowPhase(phase)
+    handleOpggGameflowPhase(phase, currentGameflowPhase !== null)
   })
 
   champSelectUnsub = lcu.observe(LcuEventUri.CHAMP_SELECT, (event: LCUEventMessage) => {
@@ -1654,7 +1658,7 @@ function startOpggListeners() {
   currentRunePageUnsub = lcu.observe(CURRENT_RUNE_PAGE_EVENT_URI, handleCurrentRunePageEvent)
 
   lcu.getGameflowPhase().then((phase) => {
-    handleOpggGameflowPhase(phase)
+    handleOpggGameflowPhase(phase, false)
   }).catch(() => { /* ignore */ })
 
   logger.info('[OPGG] 配装推荐接管已启用 ✓')
@@ -1665,7 +1669,7 @@ export function updateOpggBuildRecommendation(enabled: boolean) {
     startOpggListeners()
   } else if (enabled && phaseUnsub) {
     lcu.getGameflowPhase().then((phase) => {
-      handleOpggGameflowPhase(phase)
+      handleOpggGameflowPhase(phase, false)
     }).catch(() => { /* ignore */ })
   } else if (!enabled) {
     if (!phaseUnsub) return

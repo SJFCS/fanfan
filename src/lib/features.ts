@@ -986,7 +986,8 @@ export function initFeatures() {
   store.onChange('champSelectQuitButton', updateChampSelectQuitButton)
 
   const syncGameAnalysisPopup = () => {
-    updateGameAnalysisPopup(store.get('inGameAutoPopupMode') === 'gameAnalysis')
+    const mode = store.get('inGameAutoPopupMode')
+    updateGameAnalysisPopup(mode !== 'none', mode === 'gameAnalysis')
   }
   syncGameAnalysisPopup()
   store.onChange('inGameAutoPopupMode', syncGameAnalysisPopup)

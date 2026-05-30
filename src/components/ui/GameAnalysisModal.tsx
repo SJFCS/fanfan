@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, createElement } from 'react'
+import { useState, useEffect, useCallback, createElement, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Modal } from '@/components/ui/Modal'
 import { MatchHistoryModal } from '@/components/ui/MatchHistoryModal'
@@ -108,6 +108,24 @@ const PREMADE_BG_COLORS = [
   'rgba(192, 132, 252, 0.15)',
 ]
 
+const ANALYSIS_REQUEST_TIMEOUT_MS = 8000
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs = ANALYSIS_REQUEST_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`[GameAnalysis] request timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+
+    promise.then(resolve, reject).finally(() => {
+      window.clearTimeout(timer)
+    })
+  })
+}
+
+function requestOrNull<T>(promise: Promise<T>): Promise<T | null> {
+  return withTimeout(promise).catch(() => null)
+}
+
 // ==================== 组件 ====================
 
 export interface GameAnalysisModalProps {
@@ -129,8 +147,12 @@ export function GameAnalysisModal({ open, onClose, mockData }: GameAnalysisModal
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [premadeGroups, setPremadeGroups] = useState<Map<string, string>>(new Map())
+  const loadRunRef = useRef(0)
 
   const loadAnalysis = useCallback(async () => {
+    const runId = ++loadRunRef.current
+    const isCurrentRun = () => loadRunRef.current === runId
+
     setLoading(true)
     setError('')
     setBlueTeam([])
@@ -148,7 +170,9 @@ export function GameAnalysisModal({ open, onClose, mockData }: GameAnalysisModal
     }
 
     try {
-      const session = await lcu.getGameflowSession()
+      const session = await withTimeout(lcu.getGameflowSession())
+      if (!isCurrentRun()) return
+
       const teamOne = session.gameData.teamOne ?? []
       const teamTwo = session.gameData.teamTwo ?? []
       const selections = session.gameData.playerChampionSelections ?? []
@@ -167,7 +191,9 @@ export function GameAnalysisModal({ open, onClose, mockData }: GameAnalysisModal
       }
 
       // 判断自己所在队伍：优先从 team 匹配，否则从 selections 索引判断
-      const localPuuid = (await lcu.getSummonerInfo()).puuid
+      const localPuuid = (await withTimeout(lcu.getSummonerInfo())).puuid
+      if (!isCurrentRun()) return
+
       const isInTeamOne = teamOne.some(p => p.puuid === localPuuid)
         || selTeamOne.some(s => s.puuid === localPuuid)
 
@@ -258,13 +284,13 @@ export function GameAnalysisModal({ open, onClose, mockData }: GameAnalysisModal
           // 非主播模式：正常查询
           try {
             const [summoner, ranked, sgpResp] = await Promise.all([
-              lcu.getSummonerByPuuid(p.puuid).catch(() => null),
-              lcu.getRankedStats(p.puuid).catch(() => null),
-              lcu.getSgpMatchHistory(p.puuid, {
+              requestOrNull(lcu.getSummonerByPuuid(p.puuid)),
+              requestOrNull(lcu.getRankedStats(p.puuid)),
+              requestOrNull(lcu.getSgpMatchHistory(p.puuid, {
                 startIndex: 0,
                 count: store.get('gameAnalysisFetchCount') || 50,
                 tag: tag || undefined,
-              }).catch(() => null),
+              })),
             ])
 
             const summonerName = summoner?.gameName
@@ -366,20 +392,38 @@ export function GameAnalysisModal({ open, onClose, mockData }: GameAnalysisModal
         analyzeTeam(resolvedTeamTwo),
       ])
 
+      if (!isCurrentRun()) return
+
       setBlueTeam(sortTeamByPosition(isInTeamOne ? one : two))
       setRedTeam(sortTeamByPosition(isInTeamOne ? two : one))
     } catch (err) {
+      if (!isCurrentRun()) return
+
       setError(t('gameAnalysis.empty'))
       console.error('[GameAnalysis] 加载失败:', err)
     } finally {
-      setLoading(false)
+      if (isCurrentRun()) {
+        setLoading(false)
+      }
     }
   }, [mockData, t])
 
   // 打开时加载
   useEffect(() => {
-    if (open) loadAnalysis()
+    if (open) {
+      loadAnalysis()
+      return
+    }
+
+    loadRunRef.current++
+    setLoading(false)
   }, [open, loadAnalysis])
+
+  useEffect(() => {
+    return () => {
+      loadRunRef.current++
+    }
+  }, [])
 
   // 计算队伍平均胜率
   const avgWinRate = (team: PlayerAnalysis[]) => {
@@ -393,7 +437,7 @@ export function GameAnalysisModal({ open, onClose, mockData }: GameAnalysisModal
 
   return (
     <Modal open={open} onClose={onClose} width={1160} height={645} closable>
-      <div className="sga-container">
+      <div className="sga-container" data-sona-game-analysis-modal="true">
         {/* Header */}
         <div className="sga-header">
           <div className="sga-header-left">

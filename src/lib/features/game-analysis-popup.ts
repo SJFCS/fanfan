@@ -8,11 +8,18 @@ import { GameAnalysisModal } from '@/components/ui/GameAnalysisModal'
 
 // ==================== 进入游戏自动弹窗战力分析 ====================
 
-/** GameAnalysisModal 的独立 React root */
+const GAME_ANALYSIS_ROOT_ID = 'sona-game-analysis-root'
+const GAME_ANALYSIS_MODAL_SELECTOR = '[data-sona-game-analysis-modal="true"], .sga-container'
+const GAME_ANALYSIS_BTN_ATTR = 'data-sona-game-analysis'
+
 let gameAnalysisRoot: Root | null = null
 let gameAnalysisContainer: HTMLDivElement | null = null
+let gameAnalysisBtnRegistered = false
 let currentGameAnalysisPhase: GameflowPhase | null = null
 let gameAnalysisPhaseRunId = 0
+let lastPopupGameId = 0
+let gameAnalysisPopupUnsub: (() => void) | null = null
+let gameAnalysisAutoPopupEnabled = false
 
 function isGameAnalysisPopupActive(runId: number) {
   return currentGameAnalysisPhase === 'InProgress' && runId === gameAnalysisPhaseRunId
@@ -22,58 +29,69 @@ function shouldResetPopupGameId(phase: GameflowPhase) {
   return phase !== 'GameStart' && phase !== 'Reconnect'
 }
 
-function showGameAnalysisModal() {
-  if (currentGameAnalysisPhase !== 'InProgress') return
+function cleanupStaleGameAnalysisDom(activeContainer: HTMLDivElement | null) {
+  document.querySelectorAll<HTMLElement>('.sona-modal-overlay').forEach((overlay) => {
+    if (overlay.querySelector(GAME_ANALYSIS_MODAL_SELECTOR)) {
+      overlay.remove()
+    }
+  })
 
-  if (!gameAnalysisContainer) {
-    gameAnalysisContainer = document.createElement('div')
-    gameAnalysisContainer.id = 'sona-game-analysis-root'
-    document.body.appendChild(gameAnalysisContainer)
-    gameAnalysisRoot = createRoot(gameAnalysisContainer)
-  }
-
-  const close = () => {
-    gameAnalysisRoot?.render(
-      createElement(GameAnalysisModal, { open: false, onClose: close }),
-    )
-  }
-
-  gameAnalysisRoot!.render(
-    createElement(GameAnalysisModal, { open: true, onClose: close }),
-  )
-  logger.info('[GameAnalysis] 战力分析弹窗已显示')
+  document.querySelectorAll<HTMLDivElement>(`#${GAME_ANALYSIS_ROOT_ID}`).forEach((container) => {
+    if (container !== activeContainer) {
+      container.remove()
+    }
+  })
 }
 
-function cleanupGameAnalysisModal() {
+function destroyGameAnalysisModal() {
   if (gameAnalysisRoot) {
     gameAnalysisRoot.unmount()
     gameAnalysisRoot = null
   }
+
   if (gameAnalysisContainer) {
     gameAnalysisContainer.remove()
     gameAnalysisContainer = null
   }
+
+  cleanupStaleGameAnalysisDom(null)
+}
+
+function ensureGameAnalysisRoot(): Root {
+  if (gameAnalysisRoot && gameAnalysisContainer?.isConnected) {
+    return gameAnalysisRoot
+  }
+
+  destroyGameAnalysisModal()
+  gameAnalysisContainer = document.createElement('div')
+  gameAnalysisContainer.id = GAME_ANALYSIS_ROOT_ID
+  document.body.appendChild(gameAnalysisContainer)
+  gameAnalysisRoot = createRoot(gameAnalysisContainer)
+  return gameAnalysisRoot
+}
+
+function showGameAnalysisModal() {
+  if (currentGameAnalysisPhase !== 'InProgress') return
+
+  const root = ensureGameAnalysisRoot()
+  root.render(
+    createElement(GameAnalysisModal, { open: true, onClose: destroyGameAnalysisModal }),
+  )
+  logger.info('[GameAnalysis] 战力分析弹窗已显示')
 }
 
 // ---- 客户端内嵌按钮 ----
 
-const GAME_ANALYSIS_BTN_ATTR = 'data-sona-game-analysis'
-
-/**
- * 注入任务：在 game-in-progress-container 中注入"对局分析"按钮
- * 直接使用客户端原生的 <lol-uikit-flat-button>，自带官方金色边框、hover 动效、点击反馈
- */
 function tryInjectGameAnalysisButton(): boolean {
   const container = document.querySelector('.game-in-progress-container')
   if (!container) return false
-
-  // 已注入过，跳过
   if (container.querySelector(`[${GAME_ANALYSIS_BTN_ATTR}]`)) return true
 
   const btn = document.createElement('lol-uikit-flat-button')
   btn.setAttribute(GAME_ANALYSIS_BTN_ATTR, 'true')
   btn.textContent = '对局分析'
-  btn.style.marginTop = '12px'
+  btn.style.display = 'block'
+  btn.style.marginTop = '14px'
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation()
@@ -82,22 +100,16 @@ function tryInjectGameAnalysisButton(): boolean {
     logger.info('[GameAnalysis] 打开分析弹窗')
   })
 
-  container.appendChild(btn)
+  const buildButton = container.querySelector('[data-sona-opgg-ingame-build]')
+  if (buildButton?.parentElement === container) {
+    ;(buildButton as HTMLElement).style.marginTop = '8px'
+    buildButton.insertAdjacentElement('beforebegin', btn)
+  } else {
+    container.appendChild(btn)
+  }
   logger.info('[GameAnalysis] 客户端内嵌按钮已注入 ✓')
   return true
 }
-
-/** 清理客户端内嵌按钮 */
-function cleanupGameAnalysisButton() {
-  document.querySelectorAll(`[${GAME_ANALYSIS_BTN_ATTR}]`).forEach((el) => el.remove())
-}
-
-let gameAnalysisBtnRegistered = false
-
-/** 跟踪当前游戏 ID，确保每局只弹一次 */
-let lastPopupGameId = 0
-
-let gameAnalysisPopupUnsub: (() => void) | null = null
 
 function ensureGameAnalysisButtonRegistered() {
   if (gameAnalysisBtnRegistered) return
@@ -106,17 +118,22 @@ function ensureGameAnalysisButtonRegistered() {
   gameAnalysisBtnRegistered = true
 }
 
+function cleanupGameAnalysisButton() {
+  if (gameAnalysisBtnRegistered) {
+    injector.unregister(tryInjectGameAnalysisButton)
+    gameAnalysisBtnRegistered = false
+  }
+
+  document.querySelectorAll(`[${GAME_ANALYSIS_BTN_ATTR}]`).forEach((el) => el.remove())
+}
+
 function cleanupGameAnalysisRuntime(phase?: GameflowPhase) {
   if (!phase || shouldResetPopupGameId(phase)) {
     lastPopupGameId = 0
   }
 
-  if (gameAnalysisBtnRegistered) {
-    injector.unregister(tryInjectGameAnalysisButton)
-    gameAnalysisBtnRegistered = false
-  }
   cleanupGameAnalysisButton()
-  cleanupGameAnalysisModal()
+  destroyGameAnalysisModal()
 }
 
 function maybeShowGameAnalysisAutoPopup(runId: number) {
@@ -138,29 +155,55 @@ function maybeShowGameAnalysisAutoPopup(runId: number) {
     })
 }
 
-function handleGameAnalysisPhase(phase: GameflowPhase) {
+function rememberCurrentGameId(runId: number) {
+  lcu.getGameflowSession()
+    .then((session) => {
+      if (!isGameAnalysisPopupActive(runId)) return
+      lastPopupGameId = session.gameData?.gameId ?? -1
+    })
+    .catch(() => {
+      if (!isGameAnalysisPopupActive(runId)) return
+      lastPopupGameId = -1
+    })
+}
+
+function handleGameAnalysisPhase(phase: GameflowPhase, autoPopup = true) {
+  const previousPhase = currentGameAnalysisPhase
   currentGameAnalysisPhase = phase
   const runId = ++gameAnalysisPhaseRunId
 
   if (phase === 'InProgress') {
     ensureGameAnalysisButtonRegistered()
-    maybeShowGameAnalysisAutoPopup(runId)
+    if (autoPopup && previousPhase !== 'InProgress') {
+      maybeShowGameAnalysisAutoPopup(runId)
+    } else {
+      rememberCurrentGameId(runId)
+    }
     return
   }
 
   cleanupGameAnalysisRuntime(phase)
 }
 
-export function updateGameAnalysisPopup(enabled: boolean) {
+export function updateGameAnalysisPopup(enabled: boolean, autoPopupEnabled = enabled) {
+  gameAnalysisAutoPopupEnabled = autoPopupEnabled
+
   if (enabled && !gameAnalysisPopupUnsub) {
+    destroyGameAnalysisModal()
     gameAnalysisPopupUnsub = lcu.observe(LcuEventUri.GAMEFLOW_PHASE_CHANGE, (event: LCUEventMessage) => {
-      const phase = event.data as GameflowPhase
-      handleGameAnalysisPhase(phase)
+      handleGameAnalysisPhase(
+        event.data as GameflowPhase,
+        gameAnalysisAutoPopupEnabled && currentGameAnalysisPhase !== null,
+      )
     })
     lcu.getGameflowPhase()
-      .then(handleGameAnalysisPhase)
+      .then((phase) => handleGameAnalysisPhase(phase, false))
       .catch(() => { /* ignore */ })
     logger.info('Game analysis popup enabled ✓')
+  } else if (enabled && gameAnalysisPopupUnsub) {
+    lcu.getGameflowPhase()
+      .then((phase) => handleGameAnalysisPhase(phase, false))
+      .catch(() => { /* ignore */ })
   } else if (!enabled && gameAnalysisPopupUnsub) {
     gameAnalysisPopupUnsub()
     gameAnalysisPopupUnsub = null

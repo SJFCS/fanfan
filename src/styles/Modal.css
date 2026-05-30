@@ -134,6 +134,11 @@
   transform: scale(0.9);
 }
 
+.sona-modal-close svg,
+.sona-modal-close path {
+  pointer-events: none;
+}
+
 /* Body — 占满整个 dialog */
 .sona-modal-body {
   position: relative;
