@@ -1,20 +1,25 @@
 import { logger } from '@/index'
 import { lcu, LcuEventUri } from '@/lib/lcu'
-import type { GameflowPhase, LCUEventMessage } from '@/lib/lcu'
+import type { GameflowPhase, LCUEventMessage, Lobby } from '@/lib/lcu'
 import { AUTO_MATCHMAKING_MIN_MEMBERS_MAX, AUTO_MATCHMAKING_MIN_MEMBERS_MIN } from '@/lib/auto-matchmaking-config'
 import { store } from '@/lib/store'
 import { onAutoReturnedToLobby } from '@/lib/features/auto-return-to-lobby'
 
 const START_MATCHMAKING_RETRY_MS = 1500
+const AUTO_MATCHMAKING_REFRESH_DEBOUNCE_MS = 250
 
 let autoMatchmakingUnsubs: Array<() => void> = []
 let autoMatchmakingTimer: ReturnType<typeof setTimeout> | null = null
+let autoMatchmakingRefreshTimer: ReturnType<typeof setTimeout> | null = null
 let autoMatchmakingDueAt = 0
 let autoMatchmakingRunId = 0
 let autoMatchmakingEvaluateId = 0
 let autoMatchmakingInFlight = false
+let autoMatchmakingRefreshInFlight = false
 let lastBlockedReason: MatchmakingBlockedReason | null = null
 let lastObservedQueueId = 0
+let currentGameflowPhase: GameflowPhase | null = null
+let pendingAutoMatchmakingRefresh: { reason: string; resetExistingTimer: boolean } | null = null
 
 type MatchmakingBlockedReason =
   | 'not-in-lobby'
@@ -55,6 +60,28 @@ async function getCurrentLobbyQueueId() {
   }
 }
 
+function getLobbyFromEvent(event: LCUEventMessage): Lobby | null {
+  return event.data && typeof event.data === 'object'
+    ? event.data as Lobby
+    : null
+}
+
+async function isInLobbyPhase() {
+  if (currentGameflowPhase === 'Lobby') {
+    return true
+  }
+  if (currentGameflowPhase !== null) {
+    return false
+  }
+
+  try {
+    currentGameflowPhase = await lcu.getGameflowPhase()
+    return currentGameflowPhase === 'Lobby'
+  } catch {
+    return false
+  }
+}
+
 function getDelayMs() {
   const value = store.get('autoMatchmakingDelaySeconds')
   return (Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0) * 1000
@@ -92,11 +119,21 @@ function clearAutoMatchmakingTimer() {
   autoMatchmakingDueAt = 0
 }
 
+function clearPendingAutoMatchmakingRefresh() {
+  if (autoMatchmakingRefreshTimer) {
+    clearTimeout(autoMatchmakingRefreshTimer)
+    autoMatchmakingRefreshTimer = null
+  }
+  pendingAutoMatchmakingRefresh = null
+}
+
 function resetAutoMatchmakingRuntime() {
   clearAutoMatchmakingTimer()
+  clearPendingAutoMatchmakingRefresh()
   autoMatchmakingRunId++
   autoMatchmakingEvaluateId++
   autoMatchmakingInFlight = false
+  autoMatchmakingRefreshInFlight = false
   lastBlockedReason = null
 }
 
@@ -141,6 +178,10 @@ async function getLowPriorityPenaltyStatus(): Promise<'penalized' | 'clear' | 'u
 
 async function getMatchmakingReadiness(): Promise<MatchmakingReadiness> {
   try {
+    if (!await isInLobbyPhase()) {
+      return { canStart: false, reason: 'not-in-lobby' }
+    }
+
     const lobby = await lcu.getLobby()
 
     if (lobby.gameConfig?.isCustom) {
@@ -220,7 +261,7 @@ async function startMatchmaking(runId: number) {
       autoMatchmakingTimer = setTimeout(() => {
         autoMatchmakingTimer = null
         autoMatchmakingDueAt = 0
-        refreshAutoMatchmaking('开始匹配失败后重试')
+        requestAutoMatchmakingRefresh('开始匹配失败后重试', false, 0)
       }, START_MATCHMAKING_RETRY_MS)
       autoMatchmakingDueAt = Date.now() + START_MATCHMAKING_RETRY_MS
     }
@@ -229,8 +270,62 @@ async function startMatchmaking(runId: number) {
   }
 }
 
-async function refreshAutoMatchmaking(reason: string, resetExistingTimer = false) {
+function requestAutoMatchmakingRefresh(
+  reason: string,
+  resetExistingTimer = false,
+  debounceMs = AUTO_MATCHMAKING_REFRESH_DEBOUNCE_MS,
+) {
+  if (!isAutoMatchmakingEnabledForCurrentLobby() || currentGameflowPhase !== 'Lobby') {
+    return
+  }
+
+  pendingAutoMatchmakingRefresh = {
+    reason,
+    resetExistingTimer: Boolean(pendingAutoMatchmakingRefresh?.resetExistingTimer || resetExistingTimer),
+  }
+
+  if (autoMatchmakingRefreshTimer || autoMatchmakingRefreshInFlight) {
+    return
+  }
+
+  autoMatchmakingRefreshTimer = setTimeout(() => {
+    autoMatchmakingRefreshTimer = null
+    void drainAutoMatchmakingRefreshQueue()
+  }, debounceMs)
+}
+
+async function drainAutoMatchmakingRefreshQueue() {
+  if (autoMatchmakingRefreshInFlight) {
+    return
+  }
+
+  const queuedRefresh = pendingAutoMatchmakingRefresh
+  if (!queuedRefresh) {
+    return
+  }
+
+  pendingAutoMatchmakingRefresh = null
+  autoMatchmakingRefreshInFlight = true
+  try {
+    await runAutoMatchmakingRefresh(queuedRefresh.reason, queuedRefresh.resetExistingTimer)
+  } finally {
+    autoMatchmakingRefreshInFlight = false
+    if (pendingAutoMatchmakingRefresh && isAutoMatchmakingEnabledForCurrentLobby() && currentGameflowPhase === 'Lobby') {
+      autoMatchmakingRefreshTimer = setTimeout(() => {
+        autoMatchmakingRefreshTimer = null
+        void drainAutoMatchmakingRefreshQueue()
+      }, AUTO_MATCHMAKING_REFRESH_DEBOUNCE_MS)
+    }
+  }
+}
+
+async function runAutoMatchmakingRefresh(reason: string, resetExistingTimer = false) {
   if (autoMatchmakingInFlight || !isAutoMatchmakingEnabledForCurrentLobby()) {
+    return
+  }
+
+  if (!await isInLobbyPhase()) {
+    cancelScheduledMatchmaking('not-in-lobby')
     return
   }
 
@@ -275,40 +370,67 @@ async function refreshAutoMatchmaking(reason: string, resetExistingTimer = false
 
 export function updateAutoMatchmaking(enabled: boolean) {
   if (enabled && autoMatchmakingUnsubs.length === 0) {
+    currentGameflowPhase = null
     autoMatchmakingUnsubs = [
-      onAutoReturnedToLobby(() => refreshAutoMatchmaking('自动返回房间完成')),
-      lcu.observe(LcuEventUri.LOBBY, async () => {
-        const queueId = await getCurrentLobbyQueueId()
-        if (queueId !== lastObservedQueueId) {
-          lastObservedQueueId = queueId
-          resetAutoMatchmakingTimer('房间模式切换')
-          refreshAutoMatchmaking('房间模式切换', true)
+      onAutoReturnedToLobby(() => requestAutoMatchmakingRefresh('自动返回房间完成', false, 0)),
+      lcu.observe(LcuEventUri.LOBBY, (event: LCUEventMessage) => {
+        if (currentGameflowPhase !== 'Lobby') {
           return
         }
 
-        refreshAutoMatchmaking('房间状态变化')
+        const lobby = getLobbyFromEvent(event)
+        if (!lobby) {
+          lastObservedQueueId = 0
+          clearPendingAutoMatchmakingRefresh()
+          cancelScheduledMatchmaking('not-in-lobby')
+          return
+        }
+
+        const queueId = lobby.gameConfig?.queueId
+        if (typeof queueId === 'number' && queueId !== lastObservedQueueId) {
+          lastObservedQueueId = queueId
+          resetAutoMatchmakingTimer('房间模式切换')
+          requestAutoMatchmakingRefresh('房间模式切换', true, 0)
+          return
+        }
+
+        requestAutoMatchmakingRefresh('房间状态变化')
       }),
       lcu.observe(LcuEventUri.GAMEFLOW_PHASE_CHANGE, (event: LCUEventMessage) => {
-        if ((event.data as GameflowPhase) === 'Lobby') {
+        currentGameflowPhase = event.data as GameflowPhase
+        if (currentGameflowPhase === 'Lobby') {
           void getCurrentLobbyQueueId().then((queueId) => {
             lastObservedQueueId = queueId
+            requestAutoMatchmakingRefresh('进入房间', false, 0)
           })
-          refreshAutoMatchmaking('进入房间')
         } else {
           lastObservedQueueId = 0
+          clearPendingAutoMatchmakingRefresh()
           cancelScheduledMatchmaking('not-in-lobby')
         }
       }),
     ]
-    void getCurrentLobbyQueueId().then((queueId) => {
-      lastObservedQueueId = queueId
+    void lcu.getGameflowPhase().then((phase) => {
+      currentGameflowPhase = phase
+      if (phase !== 'Lobby') {
+        lastObservedQueueId = 0
+        cancelScheduledMatchmaking('not-in-lobby')
+        return
+      }
+
+      void getCurrentLobbyQueueId().then((queueId) => {
+        lastObservedQueueId = queueId
+        requestAutoMatchmakingRefresh('自动匹配已开启', false, 0)
+      })
+    }).catch(() => {
+      currentGameflowPhase = null
     })
-    refreshAutoMatchmaking('自动匹配已开启')
     logger.info('Auto matchmaking enabled OK')
   } else if (!enabled && autoMatchmakingUnsubs.length > 0) {
     resetAutoMatchmakingRuntime()
     autoMatchmakingUnsubs.forEach((unsubscribe) => unsubscribe())
     autoMatchmakingUnsubs = []
+    currentGameflowPhase = null
     logger.info('Auto matchmaking disabled')
   }
 }
@@ -317,6 +439,7 @@ export function stopAutoMatchmaking() {
   updateAutoMatchmaking(false)
   resetAutoMatchmakingRuntime()
   lastObservedQueueId = 0
+  currentGameflowPhase = null
 }
 
 export function refreshAutoMatchmakingConfig() {
@@ -324,5 +447,5 @@ export function refreshAutoMatchmakingConfig() {
     return
   }
 
-  refreshAutoMatchmaking('自动匹配配置变化', true)
+  requestAutoMatchmakingRefresh('自动匹配配置变化', true, 0)
 }

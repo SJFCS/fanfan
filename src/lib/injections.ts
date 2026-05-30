@@ -677,7 +677,7 @@ function getLobbyAutomationSnapshot() {
   }
 }
 
-function createLobbyAutomationSwitch(label: string, delayText: string) {
+function createLobbyAutomationSwitch(label: string, delayText = '') {
   const button = document.createElement('button')
   button.type = 'button'
   button.className = 'sona-lobby-automation-switch'
@@ -687,7 +687,9 @@ function createLobbyAutomationSwitch(label: string, delayText: string) {
       <span class="sona-lobby-automation-thumb"></span>
     </span>
   `
-  button.querySelector('.sona-lobby-automation-label')!.textContent = `${label} (${delayText})`
+  button.querySelector('.sona-lobby-automation-label')!.textContent = delayText
+    ? `${label} (${delayText})`
+    : label
   return button
 }
 

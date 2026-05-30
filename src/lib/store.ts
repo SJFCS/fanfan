@@ -30,6 +30,8 @@ export interface SonaConfig {
   autoAcceptMatch: boolean
   /** 房间右上角自动接受按钮的持久化开关状态 */
   lobbyHeaderAutoAcceptEnabled: boolean
+  /** Ready Check 时允许重新选择接受/拒绝 */
+  readyCheckReselect: boolean
   /** 自动接受对局的随机延迟：最小值（毫秒），0 或非法值视为无延迟 */
   autoAcceptDelayMin: number
   /** 自动接受对局的随机延迟：最大值（毫秒），上限 10000；非法则秒接 */
@@ -256,6 +258,7 @@ export interface SonaConfig {
 const DEFAULT_CONFIG: SonaConfig = {
   autoAcceptMatch: false,
   lobbyHeaderAutoAcceptEnabled: true,
+  readyCheckReselect: false,
   autoAcceptDelayMin: 0,
   autoAcceptDelayMax: 0,
   developerMode: false,

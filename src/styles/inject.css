@@ -398,3 +398,52 @@
 .sona-lobby-automation-controls--disabled input {
   cursor: not-allowed;
 }
+
+.ready-check-state-machine[ready-check-data-state="InProgress"] .sona-ready-check-buttons-reselect {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.ready-check-state-machine[ready-check-data-state="InProgress"] .ready-check-button-accept.sona-ready-check-accept-reselect {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.ready-check-state-machine[ready-check-data-state="InProgress"] .ready-check-button-decline.sona-ready-check-decline-reselect {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.ready-check-state-machine[ready-check-data-state="InProgress"] .sona-ready-check-reselect-clickable {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.ready-check-state-machine[ready-check-data-state="InProgress"] .sona-ready-check-reselect-inactive {
+  pointer-events: none !important;
+  cursor: default !important;
+}
+
+.ready-check-state-machine.sona-ready-check-reselect-response-accepted[ready-check-data-state="InProgress"] .ready-check-button-accept.sona-ready-check-accept-reselect {
+  z-index: 1 !important;
+}
+
+.ready-check-state-machine.sona-ready-check-reselect-response-accepted[ready-check-data-state="InProgress"] .ready-check-button-decline.sona-ready-check-decline-reselect {
+  z-index: 4 !important;
+}
+
+.ready-check-state-machine.sona-ready-check-reselect-response-declined[ready-check-data-state="InProgress"] .ready-check-button-decline.sona-ready-check-decline-reselect {
+  z-index: 1 !important;
+}
+
+.ready-check-state-machine.sona-ready-check-reselect-response-declined[ready-check-data-state="InProgress"] .ready-check-button-accept.sona-ready-check-accept-reselect {
+  z-index: 4 !important;
+}

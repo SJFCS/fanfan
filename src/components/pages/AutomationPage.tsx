@@ -144,6 +144,7 @@ function setAutoAcceptDelayRangeByMaxSeconds(maxSeconds: number) {
 export function AutomationPage() {
   const { t } = useI18n()
   const [autoAccept, setAutoAccept] = useState(store.get('autoAcceptMatch'))
+  const [readyCheckReselect, setReadyCheckReselect] = useState(store.get('readyCheckReselect'))
   // 延迟值在 UI 里用字符串存，避免"删到空 → 变 NaN"、"输到一半"等中间态被推回 store
   const [autoAcceptDelayMax, setAutoAcceptDelayMax] = useState(formatAutoAcceptDelaySecondsFromMs(store.get('autoAcceptDelayMax')))
   const [autoReturnToLobby, setAutoReturnToLobby] = useState(store.get('autoReturnToLobby'))
@@ -177,6 +178,7 @@ export function AutomationPage() {
   useEffect(() => {
     const unsubs = [
       store.onChange('autoAcceptMatch', setAutoAccept),
+      store.onChange('readyCheckReselect', setReadyCheckReselect),
       store.onChange('autoAcceptDelayMax', (v) => setAutoAcceptDelayMax(formatAutoAcceptDelaySecondsFromMs(v))),
       store.onChange('autoReturnToLobby', setAutoReturnToLobby),
       store.onChange('autoMatchmaking', setAutoMatchmaking),
@@ -345,6 +347,18 @@ export function AutomationPage() {
             onChange={(v) => {
               setAutoAccept(v)
               store.set('autoAcceptMatch', v)
+            }}
+          />
+        </SettingCard>
+        <SettingCard
+          title={t('tools.readyCheckReselect.title')}
+          description={t('tools.readyCheckReselect.description')}
+        >
+          <SonaSwitch
+            checked={readyCheckReselect}
+            onChange={(v) => {
+              setReadyCheckReselect(v)
+              store.set('readyCheckReselect', v)
             }}
           />
         </SettingCard>

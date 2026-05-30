@@ -8,6 +8,9 @@ const AUTO_ACCEPT_MAX_DELAY_MS = 10000
 let autoAcceptUnsubs: Array<() => void> = []
 let autoAcceptTimer: ReturnType<typeof setTimeout> | null = null
 let autoAcceptDueAt = 0
+let autoAcceptRunId = 0
+let autoAcceptAttempted = false
+let autoAcceptInFlightRunId: number | null = null
 
 function computeAcceptDelayMs(): number {
   const minMs = store.get('autoAcceptDelayMin')
@@ -37,17 +40,36 @@ export function getAutoAcceptCountdownMs() {
 }
 
 function scheduleAcceptMatch() {
-  cancelScheduledAccept()
+  if (autoAcceptTimer || autoAcceptAttempted || autoAcceptInFlightRunId === autoAcceptRunId) {
+    return
+  }
 
   const delayMs = computeAcceptDelayMs()
+  const runId = autoAcceptRunId
   autoAcceptDueAt = delayMs > 0 ? Date.now() + delayMs : 0
 
   const doAccept = () => {
+    if (runId !== autoAcceptRunId) {
+      return
+    }
+
     autoAcceptTimer = null
     autoAcceptDueAt = 0
+    autoAcceptAttempted = true
+    autoAcceptInFlightRunId = runId
     lcu.acceptMatch()
       .then(() => logger.info('Auto accepted match OK (delay=%dms)', delayMs))
-      .catch((err) => logger.error('Auto accept failed:', err))
+      .catch((err) => {
+        if (runId === autoAcceptRunId) {
+          autoAcceptAttempted = false
+        }
+        logger.error('Auto accept failed:', err)
+      })
+      .finally(() => {
+        if (autoAcceptInFlightRunId === runId) {
+          autoAcceptInFlightRunId = null
+        }
+      })
   }
 
   if (delayMs === 0) {
@@ -60,14 +82,25 @@ function scheduleAcceptMatch() {
 }
 
 function cancelScheduledAccept(reason?: string) {
-  if (!autoAcceptTimer) {
-    autoAcceptDueAt = 0
+  const hadTimer = Boolean(autoAcceptTimer)
+
+  if (autoAcceptTimer) {
+    clearTimeout(autoAcceptTimer)
+    autoAcceptTimer = null
+  }
+  autoAcceptDueAt = 0
+  if (reason === 'not-in-ready-check' || reason === 'disabled') {
+    autoAcceptRunId++
+    autoAcceptAttempted = false
+    autoAcceptInFlightRunId = null
+  } else if (reason === 'accepted' || reason === 'declined') {
+    autoAcceptAttempted = true
+  }
+
+  if (!hadTimer) {
     return
   }
 
-  clearTimeout(autoAcceptTimer)
-  autoAcceptTimer = null
-  autoAcceptDueAt = 0
   if (reason === 'accepted') {
     logger.info('[AutoAccept] 已手动接受，取消即将执行的自动接受')
   } else if (reason === 'declined') {
@@ -90,8 +123,15 @@ export function updateAutoAccept(enabled: boolean) {
       }),
       lcu.observe(LcuEventUri.READY_CHECK, (event: LCUEventMessage) => {
         const readyCheck = event.data as ReadyCheck | null
+        if (!readyCheck || readyCheck.state === 'Invalid') {
+          cancelScheduledAccept('not-in-ready-check')
+          return
+        }
+
         if (readyCheck?.playerResponse === 'Accepted' || readyCheck?.playerResponse === 'Declined') {
           cancelScheduledAccept(readyCheck.playerResponse.toLowerCase())
+        } else if (readyCheck.state === 'InProgress' && readyCheck.playerResponse === 'None') {
+          scheduleAcceptMatch()
         }
       }),
     ]

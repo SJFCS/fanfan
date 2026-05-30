@@ -437,6 +437,20 @@ function isTencentRegionLocale(value: unknown): boolean {
 
 type EventCallback = (message: LCUEventMessage) => void
 
+function isLcuDebugLoggingEnabled() {
+  try {
+    return store.get('developerMode')
+  } catch {
+    return false
+  }
+}
+
+function debugLcu(message: string, ...args: unknown[]) {
+  if (isLcuDebugLoggingEnabled()) {
+    console.log(message, ...args)
+  }
+}
+
 /**
  * LCUManager - 集中管理 LCU 的 REST API 和 WebSocket 事件
  *
@@ -507,7 +521,7 @@ class LCUManager {
     const uris = Array.from(this.eventListeners.keys())
     this.observedUris.clear()
 
-    console.log('[LCUManager] bindContext() → replay %d observed uri(s)', uris.length)
+    debugLcu('[LCUManager] bindContext() → replay %d observed uri(s)', uris.length)
     uris.forEach((uri) => this.observeUriOnSocket(uri))
 
     // 绑定 context 后立即初始化 SGP Token 保活
@@ -1986,14 +2000,14 @@ class LCUManager {
     }
 
     if (this.observedUris.has(uri)) {
-      console.log('[LCUManager] URI 已订阅到底层 socket，跳过重复 observe: %s', uri)
+      debugLcu('[LCUManager] URI 已订阅到底层 socket，跳过重复 observe: %s', uri)
       return
     }
 
     this.observedUris.add(uri)
-    console.log('[LCUManager] 向当前 socket 订阅 URI: %s', uri)
+    debugLcu('[LCUManager] 向当前 socket 订阅 URI: %s', uri)
     this.penguContext.socket.observe(uri, (data) => {
-      console.log('[LCUManager] WS 收到事件 → uri=%s, data=%o', uri, data)
+      debugLcu('[LCUManager] WS 收到事件 → uri=%s, data=%o', uri, data)
       const message = data as LCUEventMessage
       const cbs = this.eventListeners.get(uri)
       cbs?.forEach((cb) => cb(message))
@@ -2021,8 +2035,8 @@ class LCUManager {
    * ```
    */
   observe(uri: string, callback: EventCallback): () => void {
-    console.log('[LCUManager] observe() called → uri=%s, hasContext=%s', uri, String(Boolean(this.penguContext)))
-    console.log('[LCUManager] eventListeners has uri? %s, listeners count: %d', this.eventListeners.has(uri), this.eventListeners.get(uri)?.size ?? 0)
+    debugLcu('[LCUManager] observe() called → uri=%s, hasContext=%s', uri, String(Boolean(this.penguContext)))
+    debugLcu('[LCUManager] eventListeners has uri? %s, listeners count: %d', this.eventListeners.has(uri), this.eventListeners.get(uri)?.size ?? 0)
 
     let listeners = this.eventListeners.get(uri)
     if (!listeners) {
