@@ -1003,7 +1003,7 @@
 .sona-avatar-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  max-height: 282px;
+  max-height: 428px;
   overflow-y: auto;
   padding-right: 6px;
   gap: 10px;
