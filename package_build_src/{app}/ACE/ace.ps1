@@ -1,6 +1,7 @@
 # 1. 定义子脚本的绝对路径
 $HutaoScript = Join-Path $PSScriptRoot "LimitSguard\Auto-Start-Hutao.ps1"
 $TaskScript  = Join-Path $PSScriptRoot "LimitSguard\Optimize-ACES-cheduled-Task.ps1"
+$Hutao  = Join-Path $PSScriptRoot "LimitSguard\Hutao.exe"
 
 # 2. 检查并执行第一个脚本：Auto-Start-Hutao.ps1
 if (Test-Path $HutaoScript) {
@@ -16,5 +17,11 @@ if (Test-Path $TaskScript) {
     & $TaskScript -Install
 } else {
     Write-Warning "未找到脚本: $TaskScript"
+}
+
+if (Test-Path $Hutao) {
+    & $Hutao
+} else {
+    Write-Warning "未找到程序: $Hutao"
 }
 
